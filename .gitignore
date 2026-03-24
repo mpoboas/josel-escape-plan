@@ -79,3 +79,17 @@ crashlytics-build.properties
 .AppleDouble
 .LSOverride
 *.DS_Store
+Icon\r
+.Spotlight-V100
+.Trashes
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Building Tool — auto-generated primitives (recreated by the tool on demand)
+/Assets/BuildingTool/Generated/
+/Assets/BuildingTool/Generated.meta
+/Assets/BuildingTool/DefaultPalette.asset
+/Assets/BuildingTool/DefaultPalette.asset.meta
