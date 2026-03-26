@@ -59,19 +59,9 @@ namespace BuildingSystem
         /// </summary>
         public bool CanPlaceObject(Vector3Int gridPos, PlaceableObject prefab, Quaternion rotation)
         {
-            if (prefab.alignment == PlacementAlignment.Center)
-            {
-                foreach (var cell in GetOccupiedCells(gridPos, prefab.size, rotation))
-                {
-                    if (FindCenterObjectAt(cell) != null) return false;
-                }
-                return true;
-            }
-            else
-            {
-                int step = RotationToStep(rotation);
-                return FindEdgeObjectAt(gridPos, step) == null;
-            }
+            // By request, overlapping objects is strictly allowed in all circumstances.
+            // Returning true immediately bypasses all grid cell collision checks.
+            return true;
         }
 
         /// <summary>
@@ -150,15 +140,17 @@ namespace BuildingSystem
             float half = gridSize * 0.5f;
             Vector3 alignOffset = Vector3.zero;
 
+            Quaternion horizontalRot = Quaternion.Euler(0, worldRot.eulerAngles.y, 0);
+
             if (alignment == PlacementAlignment.Edge)
             {
-                Vector3 fwd = SnapAxis(worldRot * Vector3.forward);
+                Vector3 fwd = SnapAxis(horizontalRot * Vector3.forward);
                 alignOffset = fwd * half;
             }
             else if (alignment == PlacementAlignment.Corner)
             {
-                Vector3 fwd   = SnapAxis(worldRot * Vector3.forward);
-                Vector3 right = SnapAxis(worldRot * Vector3.right);
+                Vector3 fwd   = SnapAxis(horizontalRot * Vector3.forward);
+                Vector3 right = SnapAxis(horizontalRot * Vector3.right);
                 alignOffset = (fwd + right) * half;
             }
 

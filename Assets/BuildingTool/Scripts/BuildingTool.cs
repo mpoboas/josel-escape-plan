@@ -2,6 +2,13 @@ using UnityEngine;
 
 namespace BuildingSystem
 {
+    public enum ToolMode
+    {
+        Build,
+        Edit,
+        Remove
+    }
+
     public class BuildingTool : MonoBehaviour
     {
         [Header("Grid Settings")]
@@ -11,6 +18,7 @@ namespace BuildingSystem
         public BuildingPalette buildingPalette;
 
         [Header("State")]
+        public ToolMode currentMode = ToolMode.Build;
         public int currentFloor = 0;
         public int selectedPaletteIndex = 0;
 

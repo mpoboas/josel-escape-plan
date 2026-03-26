@@ -14,6 +14,9 @@ namespace BuildingSystem.Editor
         private GameObject      ghostObject;
         private PlaceableObject currentPrefab;
 
+        // Edit Mode selection
+        private PlaceableObject selectedEditObject;
+
         // Debug toggles (persisted via EditorPrefs)
         private bool showGridGizmos  = true;
         private bool showAlignGizmos = false;
@@ -66,11 +69,16 @@ namespace BuildingSystem.Editor
             GUILayout.Space(8);
             EditorGUILayout.LabelField("Scene Controls", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Left Click  – Place\n" +
-                "Right Click – Remove (any object at cell)\n" +
-                "R           – Rotate 90°\n" +
-                "C           – Cycle object type\n" +
-                "N / M       – Floor down / up",
+                "Mode Switch:\n" +
+                "1 – Build Mode\n" +
+                "2 – Edit Mode\n" +
+                "3 – Remove Mode\n\n" +
+                "General Tools:\n" +
+                "N / M – Floor down / up\n" +
+                "C     – Cycle object type (Build Mode)\n" +
+                "R     – Rotate Y (Yaw)\n" +
+                "T     – Rotate X (Pitch - useful for laying down corners)\n" +
+                "Y     – Rotate Z (Roll)",
                 MessageType.None);
         }
 
@@ -83,7 +91,7 @@ namespace BuildingSystem.Editor
             // ---- This tool is editor-only. Never run during Play Mode. ----
             if (Application.isPlaying)
             {
-                DestroyGhost(); // ensure ghost is cleaned up when entering play
+                DestroyGhost();
                 return;
             }
 
@@ -93,44 +101,74 @@ namespace BuildingSystem.Editor
             Event e = Event.current;
 
             HandleKeyboard(e);
+            DrawHUD();
 
-            int index = Mathf.Clamp(tool.selectedPaletteIndex, 0,
-                                    tool.buildingPalette.availableObjects.Count - 1);
+            int index = Mathf.Clamp(tool.selectedPaletteIndex, 0, tool.buildingPalette.availableObjects.Count - 1);
             tool.selectedPaletteIndex = index;
             currentPrefab = tool.buildingPalette.availableObjects[index];
 
-            // Raycast to the current floor's horizontal plane
-            float   floorY      = tool.currentFloor * tool.gridSize;
+            // In all modes, we consume passive clicks to prevent losing selection of the tool
+            int id = GUIUtility.GetControlID(FocusType.Passive);
+            if (e.type == EventType.Layout) HandleUtility.AddDefaultControl(id);
+
+            if (tool.currentMode == ToolMode.Build)
+            {
+                RunBuildMode(e, sceneView);
+            }
+            else if (tool.currentMode == ToolMode.Edit)
+            {
+                RunEditMode(e, sceneView);
+            }
+            else if (tool.currentMode == ToolMode.Remove)
+            {
+                RunRemoveMode(e, sceneView);
+            }
+        }
+
+        private void DrawHUD()
+        {
+            Handles.BeginGUI();
+            GUILayout.BeginArea(new Rect(10, 10, 250, 100));
+            var style = new GUIStyle(GUI.skin.box);
+            style.fontSize = 16;
+            style.fontStyle = FontStyle.Bold;
+            
+            Color modeColor = Color.white;
+            if (tool.currentMode == ToolMode.Build) modeColor = Color.green;
+            else if (tool.currentMode == ToolMode.Edit) modeColor = Color.yellow;
+            else if (tool.currentMode == ToolMode.Remove) modeColor = new Color(1f, 0.3f, 0.3f);
+            
+            GUI.color = modeColor;
+            GUILayout.Box($"MODE: {tool.currentMode.ToString().ToUpper()}", style);
+            GUI.color = Color.white;
+            GUILayout.EndArea();
+            Handles.EndGUI();
+        }
+
+        // ----------------------------------------------------------------
+        // Modes
+        // ----------------------------------------------------------------
+
+        private void RunBuildMode(Event e, SceneView sceneView)
+        {
+            float floorY = tool.currentFloor * tool.gridSize;
             Vector3 planeOrigin = tool.transform.TransformPoint(new Vector3(0, floorY, 0));
-            var     gridPlane   = new Plane(Vector3.up, planeOrigin);
-            Ray     ray         = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+            var gridPlane = new Plane(Vector3.up, planeOrigin);
+            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
 
             if (gridPlane.Raycast(ray, out float enter))
             {
-                Vector3    hitWorld = ray.GetPoint(enter);
-                Vector3    localHit = tool.transform.InverseTransformPoint(hitWorld);
-                Vector3Int gridPos  = GridData.PositionToGridCoord(localHit, tool.gridSize);
-                gridPos.y = tool.currentFloor; // pin to the selected floor
+                Vector3 hitWorld = ray.GetPoint(enter);
+                Vector3 localHit = tool.transform.InverseTransformPoint(hitWorld);
+                Vector3Int gridPos = GridData.PositionToGridCoord(localHit, tool.gridSize);
+                gridPos.y = tool.currentFloor;
 
                 if (showGridGizmos) DrawGrid(gridPos);
                 UpdateGhost(gridPos);
 
-                // Prevent Unity from de-selecting our tool's GameObject
-                int id = GUIUtility.GetControlID(FocusType.Passive);
-                if (e.type == EventType.Layout)
-                    HandleUtility.AddDefaultControl(id);
-
-                if (e.type == EventType.MouseDown && e.button == 0)
+                if (e.type == EventType.MouseDown && e.button == 0) // Left click Place
                 {
-                    if (tool.Grid.CanPlaceObject(gridPos, currentPrefab, currentRotation))
-                    {
-                        PlaceObject(gridPos);
-                        e.Use();
-                    }
-                }
-                else if (e.type == EventType.MouseDown && e.button == 1)
-                {
-                    RemoveObjectAt(gridPos);
+                    PlaceObject(gridPos);
                     e.Use();
                 }
 
@@ -142,6 +180,106 @@ namespace BuildingSystem.Editor
             }
         }
 
+        private void RunRemoveMode(Event e, SceneView sceneView)
+        {
+            DestroyGhost();
+
+            PlaceableObject hoverObj = GetHoveredPlaceableObject(e.mousePosition);
+            if (hoverObj != null)
+            {
+                // Highlight hovered object in red
+                Handles.color = new Color(1f, 0f, 0f, 0.5f);
+                Bounds b = GetObjectBounds(hoverObj);
+                Handles.DrawWireCube(b.center, b.size * 1.05f);
+
+                if (e.type == EventType.MouseDown && e.button == 0) // Left click Remove
+                {
+                    Undo.DestroyObjectImmediate(hoverObj.gameObject);
+                    tool.Grid.InvalidateCache();
+                    EditorUtility.SetDirty(tool.gameObject);
+                    e.Use();
+                }
+            }
+            sceneView.Repaint();
+        }
+
+        private void RunEditMode(Event e, SceneView sceneView)
+        {
+            DestroyGhost();
+
+            // Deselect if clicking empty space
+            if (e.type == EventType.MouseDown && e.button == 0)
+            {
+                PlaceableObject clickedObj = GetHoveredPlaceableObject(e.mousePosition);
+                selectedEditObject = clickedObj;
+                e.Use();
+            }
+
+            // Draw hover highlight
+            PlaceableObject hoverObj = GetHoveredPlaceableObject(e.mousePosition);
+            if (hoverObj != null && hoverObj != selectedEditObject)
+            {
+                Handles.color = new Color(1f, 1f, 1f, 0.3f);
+                Bounds b = GetObjectBounds(hoverObj);
+                Handles.DrawWireCube(b.center, b.size * 1.02f);
+                sceneView.Repaint();
+            }
+
+            // Draw selected highlight
+            if (selectedEditObject != null)
+            {
+                Handles.color = Color.yellow;
+                Bounds b = GetObjectBounds(selectedEditObject);
+                Handles.DrawWireCube(b.center, b.size * 1.05f);
+                
+                Handles.Label(b.center + Vector3.up * (b.extents.y + 0.2f), "SELECTED (Press R, T, Y to rotate)");
+                sceneView.Repaint();
+            }
+        }
+
+        private PlaceableObject cachedHover;
+
+        private PlaceableObject GetHoveredPlaceableObject(Vector2 mousePosition)
+        {
+            Event e = Event.current;
+            // Prevent picking during Layout or Repaint to avoid '!m_InsideContext' GUI exception
+            if (e.type == EventType.Layout || e.type == EventType.Repaint)
+            {
+                if (cachedHover != null && cachedHover.gameObject == null) cachedHover = null;
+                return cachedHover;
+            }
+
+            GameObject picked = HandleUtility.PickGameObject(mousePosition, false);
+            if (picked == null || picked.name == "__Ghost__")
+            {
+                cachedHover = null;
+                return null;
+            }
+
+            PlaceableObject po = picked.GetComponentInParent<PlaceableObject>();
+            if (po != null && po.transform.IsChildOf(tool.transform))
+            {
+                cachedHover = po;
+                return po;
+            }
+
+            cachedHover = null;
+            return null;
+        }
+
+        private Bounds GetObjectBounds(PlaceableObject obj)
+        {
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return new Bounds(obj.transform.position, Vector3.one);
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+            return bounds;
+        }
+
         // ----------------------------------------------------------------
         // Keyboard
         // ----------------------------------------------------------------
@@ -150,17 +288,43 @@ namespace BuildingSystem.Editor
         {
             if (e.type != EventType.KeyDown) return;
 
-            if (e.keyCode == KeyCode.R)
+            // Mode switching
+            if (e.keyCode == KeyCode.Alpha1) { tool.currentMode = ToolMode.Build; DestroyGhost(); e.Use(); return; }
+            if (e.keyCode == KeyCode.Alpha2) { tool.currentMode = ToolMode.Edit; DestroyGhost(); e.Use(); return; }
+            if (e.keyCode == KeyCode.Alpha3) { tool.currentMode = ToolMode.Remove; DestroyGhost(); e.Use(); return; }
+
+            // Rotations (R = Y-axis/Yaw, T = X-axis/Pitch, Y = Z-axis/Roll)
+            if (e.keyCode == KeyCode.R || e.keyCode == KeyCode.T || e.keyCode == KeyCode.Y)
             {
-                currentRotation *= Quaternion.Euler(0, 90, 0);
-                DestroyGhost();
-                e.Use();
+                Vector3 eulerChange = Vector3.zero;
+                if (e.keyCode == KeyCode.R) eulerChange = new Vector3(0, 90, 0);       // Yaw
+                else if (e.keyCode == KeyCode.T) eulerChange = new Vector3(90, 0, 0);  // Pitch (lay down)
+                else if (e.keyCode == KeyCode.Y) eulerChange = new Vector3(0, 0, 90);  // Roll
+
+                if (tool.currentMode == ToolMode.Build)
+                {
+                    currentRotation *= Quaternion.Euler(eulerChange);
+                    DestroyGhost();
+                    e.Use();
+                }
+                else if (tool.currentMode == ToolMode.Edit && selectedEditObject != null)
+                {
+                    Undo.RecordObject(selectedEditObject.transform, "Rotate Edit Object");
+                    
+                    // Rotate the object in place
+                    selectedEditObject.transform.rotation *= Quaternion.Euler(eulerChange);
+                    
+                    EditorUtility.SetDirty(selectedEditObject);
+                    e.Use();
+                }
+                return;
             }
-            else if (e.keyCode == KeyCode.C)
+
+            // Other keys
+            if (e.keyCode == KeyCode.C && tool.currentMode == ToolMode.Build)
             {
-                tool.selectedPaletteIndex =
-                    (tool.selectedPaletteIndex + 1) % tool.buildingPalette.availableObjects.Count;
-                currentRotation = Quaternion.identity; // reset rotation on type change
+                tool.selectedPaletteIndex = (tool.selectedPaletteIndex + 1) % tool.buildingPalette.availableObjects.Count;
+                currentRotation = Quaternion.identity; // reset rotation
                 DestroyGhost();
                 e.Use();
             }
@@ -184,36 +348,32 @@ namespace BuildingSystem.Editor
         {
             if (currentPrefab == null) return;
 
-            // Rebuild ghost if stale
             if (ghostObject == null ||
                 ghostObject.GetComponent<PlaceableObject>()?.objectType != currentPrefab.objectType)
             {
                 DestroyGhost();
-                ghostObject           = (GameObject)PrefabUtility.InstantiatePrefab(currentPrefab.gameObject);
-                ghostObject.name      = "__Ghost__";
+                ghostObject = (GameObject)PrefabUtility.InstantiatePrefab(currentPrefab.gameObject);
+                ghostObject.name = "__Ghost__";
                 ghostObject.hideFlags = HideFlags.HideAndDontSave;
                 foreach (var c in ghostObject.GetComponentsInChildren<Collider>())
                     Object.DestroyImmediate(c);
             }
 
-            // Position = cell centre + alignment offset
-            Vector3 cellCentre  = tool.transform.TransformPoint(GridData.GridCoordToPosition(gridPos, tool.gridSize));
+            Vector3 cellCentre = tool.transform.TransformPoint(GridData.GridCoordToPosition(gridPos, tool.gridSize));
             Vector3 alignOffset = currentPrefab.GetAlignmentOffset(currentRotation, tool.gridSize);
             ghostObject.transform.position = cellCentre + alignOffset;
             ghostObject.transform.rotation = tool.transform.rotation * currentRotation;
 
-            // Colour feedback — query the live hierarchy
-            bool  canPlace   = tool.Grid.CanPlaceObject(gridPos, currentPrefab, currentRotation);
-            Color ghostColor = canPlace ? new Color(0f, 1f, 0f, 0.4f) : new Color(1f, 0f, 0f, 0.4f);
+            // Since overlapping is allowed, ghost is always green
+            Color ghostColor = new Color(0f, 1f, 0f, 0.4f);
             foreach (var r in ghostObject.GetComponentsInChildren<Renderer>())
             {
                 var block = new MaterialPropertyBlock();
-                block.SetColor("_Color",     ghostColor);
+                block.SetColor("_Color", ghostColor);
                 block.SetColor("_BaseColor", ghostColor);
                 r.SetPropertyBlock(block);
             }
 
-            // Alignment gizmos
             if (showAlignGizmos)
             {
                 Handles.color = Color.yellow;
@@ -231,7 +391,7 @@ namespace BuildingSystem.Editor
         }
 
         // ----------------------------------------------------------------
-        // Place / Remove
+        // Place
         // ----------------------------------------------------------------
 
         private void PlaceObject(Vector3Int gridPos)
@@ -242,69 +402,31 @@ namespace BuildingSystem.Editor
             Transform floorParent = tool.GetFloorParent(tool.currentFloor);
             newObj.transform.SetParent(floorParent);
 
-            Vector3 cellCentre  = tool.transform.TransformPoint(GridData.GridCoordToPosition(gridPos, tool.gridSize));
+            Vector3 cellCentre = tool.transform.TransformPoint(GridData.GridCoordToPosition(gridPos, tool.gridSize));
             Vector3 alignOffset = currentPrefab.GetAlignmentOffset(currentRotation, tool.gridSize);
             newObj.transform.position = cellCentre + alignOffset;
             newObj.transform.rotation = tool.transform.rotation * currentRotation;
 
             EditorUtility.SetDirty(tool.gameObject);
-            tool.Grid.InvalidateCache(); // hierarchy changed, refresh next query
+            tool.Grid.InvalidateCache(); 
 
             // Continuous wall snapping (Shift + click)
             if (currentPrefab.alignment == PlacementAlignment.Edge && Event.current.shift)
                 TryExtendWall(gridPos, floorParent);
         }
 
-        /// <summary>
-        /// Right-click removal: finds ANY placeable object at the hovered cell,
-        /// regardless of which object type is currently selected in the palette.
-        /// Tries same-alignment match first, then falls back to anything at the cell.
-        /// </summary>
-        private void RemoveObjectAt(Vector3Int gridPos)
-        {
-            if (tool == null) return;
-
-            // 1. Try to find by the currently selected alignment+rotation (most likely intent)
-            PlaceableObject found = tool.Grid.FindAnyObjectAt(gridPos, currentPrefab.alignment, currentRotation);
-
-            // 2. Fallback: scan all PlaceableObjects physically near this cell
-            if (found == null)
-            {
-                float       s         = tool.gridSize;
-                Vector3     cellWorld = tool.transform.TransformPoint(GridData.GridCoordToPosition(gridPos, s));
-                float       threshold = s * 0.55f; // slightly larger than half-cell
-
-                foreach (var po in tool.transform.GetComponentsInChildren<PlaceableObject>())
-                {
-                    if (Vector3.Distance(po.transform.position, cellWorld) < threshold)
-                    {
-                        found = po;
-                        break;
-                    }
-                }
-            }
-
-            if (found == null) return;
-
-            Undo.DestroyObjectImmediate(found.gameObject);
-            tool.Grid.InvalidateCache(); // hierarchy changed, refresh next query
-            EditorUtility.SetDirty(tool.gameObject);
-        }
-
         private void TryExtendWall(Vector3Int fromCell, Transform floorParent)
         {
-            Vector3    forward      = currentRotation * Vector3.forward;
-            Vector3Int step         = new Vector3Int(Mathf.RoundToInt(forward.x), 0, Mathf.RoundToInt(forward.z));
+            Vector3 forward = currentRotation * Vector3.forward;
+            Vector3Int step = new Vector3Int(Mathf.RoundToInt(forward.x), 0, Mathf.RoundToInt(forward.z));
             Vector3Int adjacentCell = fromCell + step;
-            Quaternion oppositeRot  = currentRotation * Quaternion.Euler(0, 180, 0);
-
-            if (!tool.Grid.CanPlaceObject(adjacentCell, currentPrefab, oppositeRot)) return;
+            Quaternion oppositeRot = currentRotation * Quaternion.Euler(0, 180, 0);
 
             GameObject newObj = (GameObject)PrefabUtility.InstantiatePrefab(currentPrefab.gameObject);
             Undo.RegisterCreatedObjectUndo(newObj, "Place Building Object (Auto-extend)");
             newObj.transform.SetParent(floorParent);
 
-            Vector3 cellCentre  = tool.transform.TransformPoint(GridData.GridCoordToPosition(adjacentCell, tool.gridSize));
+            Vector3 cellCentre = tool.transform.TransformPoint(GridData.GridCoordToPosition(adjacentCell, tool.gridSize));
             Vector3 alignOffset = currentPrefab.GetAlignmentOffset(oppositeRot, tool.gridSize);
             newObj.transform.position = cellCentre + alignOffset;
             newObj.transform.rotation = tool.transform.rotation * oppositeRot;
@@ -318,44 +440,41 @@ namespace BuildingSystem.Editor
 
         private void DrawGrid(Vector3Int center)
         {
-            float s      = tool.gridSize;
-            int   radius = 5;
+            float s = tool.gridSize;
+            int radius = 5;
 
             Handles.color = new Color(1f, 1f, 1f, 0.15f);
             for (int x = -radius; x <= radius; x++)
             for (int z = -radius; z <= radius; z++)
             {
-                Vector3Int coord   = new Vector3Int(center.x + x, center.y, center.z + z);
-                Vector3    cellPos = tool.transform.TransformPoint(GridData.GridCoordToPosition(coord, s));
-                Vector3    p1 = cellPos + new Vector3(-s/2, 0, -s/2);
-                Vector3    p2 = cellPos + new Vector3( s/2, 0, -s/2);
-                Vector3    p3 = cellPos + new Vector3( s/2, 0,  s/2);
-                Vector3    p4 = cellPos + new Vector3(-s/2, 0,  s/2);
+                Vector3Int coord = new Vector3Int(center.x + x, center.y, center.z + z);
+                Vector3 cellPos = tool.transform.TransformPoint(GridData.GridCoordToPosition(coord, s));
+                Vector3 p1 = cellPos + new Vector3(-s/2, 0, -s/2);
+                Vector3 p2 = cellPos + new Vector3(s/2, 0, -s/2);
+                Vector3 p3 = cellPos + new Vector3(s/2, 0, s/2);
+                Vector3 p4 = cellPos + new Vector3(-s/2, 0, s/2);
                 Handles.DrawLine(p1, p2);
                 Handles.DrawLine(p2, p3);
                 Handles.DrawLine(p3, p4);
                 Handles.DrawLine(p4, p1);
             }
 
-            // Highlight hovered cell
             Handles.color = new Color(1f, 1f, 0f, 0.5f);
             Vector3 cp = tool.transform.TransformPoint(GridData.GridCoordToPosition(center, s));
             Handles.DrawWireDisc(cp, Vector3.up, s * 0.1f);
 
             if (showAlignGizmos)
             {
-                // Edge midpoints (cyan)
                 Handles.color = new Color(0f, 0.8f, 1f, 0.5f);
                 foreach (var em in new[] {
-                    cp + new Vector3( s/2, 0,    0), cp + new Vector3(-s/2, 0,    0),
-                    cp + new Vector3(   0, 0,  s/2), cp + new Vector3(   0, 0, -s/2) })
+                    cp + new Vector3(s/2, 0, 0), cp + new Vector3(-s/2, 0, 0),
+                    cp + new Vector3(0, 0, s/2), cp + new Vector3(0, 0, -s/2) })
                     Handles.DrawWireDisc(em, Vector3.up, 0.05f);
 
-                // Corner points (orange)
                 Handles.color = new Color(1f, 0.5f, 0f, 0.5f);
                 foreach (var co in new[] {
-                    cp + new Vector3( s/2, 0,  s/2), cp + new Vector3(-s/2, 0,  s/2),
-                    cp + new Vector3( s/2, 0, -s/2), cp + new Vector3(-s/2, 0, -s/2) })
+                    cp + new Vector3(s/2, 0, s/2), cp + new Vector3(-s/2, 0, s/2),
+                    cp + new Vector3(s/2, 0, -s/2), cp + new Vector3(-s/2, 0, -s/2) })
                     Handles.DrawWireDisc(co, Vector3.up, 0.05f);
             }
         }

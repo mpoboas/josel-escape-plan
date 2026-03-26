@@ -45,21 +45,20 @@ namespace BuildingSystem
         {
             float half = gridSize * 0.5f;
 
+            // Flatten rotation to purely horizontal (Yaw) so pitching/rolling
+            // an object (like laying down columns) doesn't cause it to fly into the air!
+            Quaternion horizontalRot = Quaternion.Euler(0, rotation.eulerAngles.y, 0);
+
             switch (alignment)
             {
                 case PlacementAlignment.Edge:
-                    // The piece's "front" is its local +Z. Rotating the world-space
-                    // +Z direction by the current rotation gives us the edge direction.
-                    Vector3 forward = rotation * Vector3.forward;
-                    // Snap to cardinal axis to avoid floating-point drift
-                    forward = SnapToCardinal(forward);
-                    return forward * half;
+                    Vector3 forward = horizontalRot * Vector3.forward;
+                    return SnapToCardinal(forward) * half;
 
                 case PlacementAlignment.Corner:
-                    // Corners sit at the diagonal. Use both local X and Z.
-                    Vector3 right   = SnapToCardinal(rotation * Vector3.right);
-                    Vector3 fwd     = SnapToCardinal(rotation * Vector3.forward);
-                    return (right + fwd) * half;
+                    Vector3 right   = horizontalRot * Vector3.right;
+                    Vector3 fwd     = horizontalRot * Vector3.forward;
+                    return (SnapToCardinal(right) + SnapToCardinal(fwd)) * half;
 
                 default: // Center
                     return Vector3.zero;
