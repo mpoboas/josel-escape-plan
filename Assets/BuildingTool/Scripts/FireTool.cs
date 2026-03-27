@@ -46,7 +46,7 @@ namespace BuildingSystem
         public float ceilingParticleSize = 0.6f;
         
         [Tooltip("Buoyancy push against ceiling (Negative means it floats up)")]
-        public float ceilingGravity = -0.5f;
+        public float ceilingGravity = 0f;
 
         // Static reference so FireSpreadNodes can easily read from it live
         public static FireTool Instance;

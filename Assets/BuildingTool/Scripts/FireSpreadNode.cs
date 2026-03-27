@@ -39,7 +39,7 @@ namespace BuildingSystem
             {
                 // Create Ceiling Fire but don't play it yet
                 GameObject ceilingObj = CreateBaseParticleObject("CeilingJet", transform);
-                ceilingObj.transform.position = ceilingHitPoint + Vector3.down * 0.05f;
+                // We will position it correctly in Update based on particle size to prevent clipping
                 ceilingObj.transform.rotation = Quaternion.LookRotation(Vector3.down);
                 ceilingPS = ceilingObj.GetComponent<ParticleSystem>();
 
@@ -85,6 +85,10 @@ namespace BuildingSystem
                 cMain.startLifetime = FireTool.Instance.ceilingMaxRadius / FireTool.Instance.ceilingSpreadSpeed;
                 cMain.startSize = new ParticleSystem.MinMaxCurve(0.2f, FireTool.Instance.ceilingParticleSize);
                 cMain.gravityModifier = FireTool.Instance.ceilingGravity;
+                
+                // Prevent particle textures from visually piercing through paper-thin ceilings
+                float lowestOffset = (FireTool.Instance.ceilingParticleSize * 0.5f) + 0.05f;
+                ceilingPS.transform.position = ceilingHitPoint + Vector3.down * lowestOffset;
 
                 var cEmission = ceilingPS.emission;
                 cEmission.rateOverTime = FireTool.Instance.ceilingEmissionRate;
@@ -101,9 +105,10 @@ namespace BuildingSystem
                     cColl.enabled = true;
                     cColl.type = ParticleSystemCollisionType.World;
                     cColl.mode = ParticleSystemCollisionMode.Collision3D;
+                    cColl.quality = ParticleSystemCollisionQuality.High; // Forces exact physics raycasts to prevent clipping through ceilings
                     cColl.bounce = 0.1f;
                     cColl.dampen = 0.8f;
-                    cColl.radiusScale = 0.5f;
+                    cColl.radiusScale = 0.6f; // Make the particle physics sphere slightly larger than the visual to stop them earlier
                     cColl.collidesWith = Physics.AllLayers;
                 }
             }
