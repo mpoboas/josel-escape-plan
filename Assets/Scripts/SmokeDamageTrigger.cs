@@ -4,7 +4,9 @@ using UnityEngine;
 [RequireComponent(typeof(ParticleSystem))]
 public class SmokeDamageTrigger : MonoBehaviour
 {
+    [SerializeField] private bool applySmokeDamageToPlayer = false;
     [SerializeField] private SmokeHealthReceiver smokeHealthReceiver;
+    [SerializeField] private SmokeVisionEffect smokeVisionEffect;
     [SerializeField] private float baseDamagePerParticle = 1f;
     [SerializeField] private int initialBufferSize = 256;
 
@@ -25,11 +27,37 @@ public class SmokeDamageTrigger : MonoBehaviour
         particleSystemRef = GetComponent<ParticleSystem>();
         insideParticles = new List<ParticleSystem.Particle>(Mathf.Max(16, initialBufferSize));
         TryResolveReceiver();
+        TryResolveVisionEffect();
     }
 
     private void OnParticleTrigger()
     {
         if (particleSystemRef == null)
+        {
+            return;
+        }
+
+        int insideCount = particleSystemRef.GetTriggerParticles(
+            ParticleSystemTriggerEventType.Inside,
+            insideParticles
+        );
+
+        if (insideCount <= 0)
+        {
+            return;
+        }
+
+        if (smokeVisionEffect == null)
+        {
+            TryResolveVisionEffect();
+        }
+
+        if (smokeVisionEffect != null)
+        {
+            smokeVisionEffect.SetParticleExposure(insideCount);
+        }
+
+        if (!applySmokeDamageToPlayer)
         {
             return;
         }
@@ -43,16 +71,6 @@ public class SmokeDamageTrigger : MonoBehaviour
             }
         }
 
-        int insideCount = particleSystemRef.GetTriggerParticles(
-            ParticleSystemTriggerEventType.Inside,
-            insideParticles
-        );
-
-        if (insideCount <= 0)
-        {
-            return;
-        }
-
         float damage = insideCount * baseDamagePerParticle * Time.deltaTime;
         smokeHealthReceiver.TakeSmokeDamage(damage);
     }
@@ -63,6 +81,15 @@ public class SmokeDamageTrigger : MonoBehaviour
         if (player != null)
         {
             smokeHealthReceiver = player.GetComponent<SmokeHealthReceiver>();
+        }
+    }
+
+    private void TryResolveVisionEffect()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            smokeVisionEffect = player.GetComponent<SmokeVisionEffect>();
         }
     }
 }
