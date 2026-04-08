@@ -33,10 +33,16 @@ public class PlayerInteraction : MonoBehaviour
     [Tooltip("Key the player presses to interact.")]
     public KeyCode interactKey = KeyCode.E;
 
+    [Tooltip("Key the player presses to inspect an object (e.g. check temperature).")]
+    public KeyCode inspectKey = KeyCode.R;
+
     [Header("UI Prompt (optional)")]
     [Tooltip("A UI Text or TMP_Text component that shows the interaction hint. " +
              "Assign in the Inspector; leave empty to skip.")]
     public Text interactPrompt;   // swap for TMP_Text if you use TextMeshPro
+
+    [Tooltip("Componente InspectUI para mostrar o toast de inspeção.")]
+    public InspectUI inspectUI;
 
     // ── runtime state ──────────────────────────────────────────────────
     private IInteractable _currentTarget;
@@ -60,8 +66,21 @@ public class PlayerInteraction : MonoBehaviour
     {
         ScanForInteractable();
 
-        if (_currentTarget != null && Input.GetKeyDown(interactKey))
-            _currentTarget.Interact();
+        if (_currentTarget != null)
+        {
+            if (Input.GetKeyDown(interactKey))
+                _currentTarget.Interact();
+
+            if (Input.GetKeyDown(inspectKey))
+            {
+                IInspectable inspectable = (_currentTarget as MonoBehaviour)?.GetComponent<IInspectable>();
+                if (inspectable != null)
+                {
+                    InspectResult result = inspectable.Inspect();
+                    inspectUI?.ShowToast(result);
+                }
+            }
+        }
     }
 
     // ── core raycast ────────────────────────────────────────────────────

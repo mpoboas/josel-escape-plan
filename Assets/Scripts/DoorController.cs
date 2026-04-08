@@ -5,7 +5,7 @@ using UnityEngine;
 /// The door is toggled when the player looks at the handle collider and presses E
 /// (handled by PlayerInteraction.cs via the IInteractable interface).
 /// </summary>
-public class DoorController : MonoBehaviour, IInteractable
+public class DoorController : MonoBehaviour, IInteractable, IInspectable
 {
     [Header("Animator")]
     [Tooltip("Animator component that contains the open and close animations.")]
@@ -16,6 +16,10 @@ public class DoorController : MonoBehaviour, IInteractable
     public string openTrigger = "Door_Open";
     [Tooltip("Trigger name defined in the Animator for the Close animation.")]
     public string closeTrigger = "Door_Close";
+
+    [Header("Temperatura")]
+    [Tooltip("Temperatura atual da porta em graus Celsius.")]
+    public float temperature = 20f;
 
     private bool isOpen = false;
 
@@ -66,5 +70,16 @@ public class DoorController : MonoBehaviour, IInteractable
     public string GetInteractText()
     {
         return isOpen ? "Close Door [E]" : "Open Door [E]";
+    }
+
+    /// <summary>
+    /// Chamado por PlayerInteraction quando o jogador prime R enquanto olha para a porta.
+    /// </summary>
+    public InspectResult Inspect()
+    {
+        if (temperature >= 60f)
+            return new InspectResult { message = "Está bué quente amigo", isSafe = false };
+        else
+            return new InspectResult { message = "Tranquilíssimo", isSafe = true };
     }
 }
