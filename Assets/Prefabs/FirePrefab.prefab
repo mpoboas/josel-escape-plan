@@ -3629,7 +3629,7 @@ ParticleSystem:
         m_NumAlphaKeys: 2
     range: {x: 0, y: 1}
   CollisionModule:
-    enabled: 1
+    enabled: 0
     serializedVersion: 4
     type: 1
     collisionMode: 0
@@ -4859,7 +4859,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 358aa93440008452eab644cadaaea665, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SmokeDamageTrigger
-  applySmokeDamageToPlayer: 0
+  applySmokeDamageToPlayer: 1
   smokeHealthReceiver: {fileID: 0}
   smokeVisionEffect: {fileID: 0}
   baseDamagePerParticle: 1

@@ -7,11 +7,13 @@ public class SmokeHealthReceiver : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool logPostureInfoOnDamage = true;
+    [SerializeField] private bool immuneToSmokeWhileCrouched = true;
 
     private CharacterController characterController;
     private CapsuleCollider capsuleCollider;
     private Component firstPersonController;
     private PropertyInfo isCrouchedProperty;
+    private FieldInfo isCrouchedField;
     private bool gameOverLogged;
 
     private void Awake()
@@ -26,12 +28,21 @@ public class SmokeHealthReceiver : MonoBehaviour
                 "IsCrouched",
                 BindingFlags.Instance | BindingFlags.Public
             );
+            isCrouchedField = firstPersonController.GetType().GetField(
+                "isCrouched",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
         }
     }
 
     public void TakeSmokeDamage(float damageAmount)
     {
         if (damageAmount <= 0f || gameOverLogged)
+        {
+            return;
+        }
+
+        if (immuneToSmokeWhileCrouched && IsPlayerCrouched())
         {
             return;
         }
@@ -56,17 +67,34 @@ public class SmokeHealthReceiver : MonoBehaviour
         }
     }
 
+    public bool IsPlayerCrouched()
+    {
+        return TryGetCrouchedState() == true;
+    }
+
     private bool? TryGetCrouchedState()
     {
-        if (isCrouchedProperty == null || firstPersonController == null)
+        if (firstPersonController == null)
         {
             return null;
         }
 
-        object value = isCrouchedProperty.GetValue(firstPersonController);
-        if (value is bool crouched)
+        if (isCrouchedProperty != null)
         {
-            return crouched;
+            object propertyValue = isCrouchedProperty.GetValue(firstPersonController);
+            if (propertyValue is bool crouchedFromProperty)
+            {
+                return crouchedFromProperty;
+            }
+        }
+
+        if (isCrouchedField != null)
+        {
+            object fieldValue = isCrouchedField.GetValue(firstPersonController);
+            if (fieldValue is bool crouchedFromField)
+            {
+                return crouchedFromField;
+            }
         }
 
         return null;

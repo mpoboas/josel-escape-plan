@@ -7,6 +7,7 @@ public class SmokeDamageTrigger : MonoBehaviour
     [SerializeField] private bool applySmokeDamageToPlayer = false;
     [SerializeField] private SmokeHealthReceiver smokeHealthReceiver;
     [SerializeField] private SmokeVisionEffect smokeVisionEffect;
+    [SerializeField] private Collider playerCollider;
     [SerializeField] private float baseDamagePerParticle = 1f;
     [SerializeField] private int initialBufferSize = 256;
 
@@ -28,6 +29,8 @@ public class SmokeDamageTrigger : MonoBehaviour
         insideParticles = new List<ParticleSystem.Particle>(Mathf.Max(16, initialBufferSize));
         TryResolveReceiver();
         TryResolveVisionEffect();
+        TryResolvePlayerCollider();
+        EnsureTriggerColliderAssigned();
     }
 
     private void OnParticleTrigger()
@@ -35,6 +38,12 @@ public class SmokeDamageTrigger : MonoBehaviour
         if (particleSystemRef == null)
         {
             return;
+        }
+
+        if (playerCollider == null)
+        {
+            TryResolvePlayerCollider();
+            EnsureTriggerColliderAssigned();
         }
 
         int insideCount = particleSystemRef.GetTriggerParticles(
@@ -91,5 +100,41 @@ public class SmokeDamageTrigger : MonoBehaviour
         {
             smokeVisionEffect = player.GetComponent<SmokeVisionEffect>();
         }
+    }
+
+    private void TryResolvePlayerCollider()
+    {
+        if (playerCollider != null)
+        {
+            return;
+        }
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+        {
+            return;
+        }
+
+        playerCollider = player.GetComponent<Collider>();
+        if (playerCollider == null)
+        {
+            playerCollider = player.GetComponentInChildren<Collider>();
+        }
+    }
+
+    private void EnsureTriggerColliderAssigned()
+    {
+        if (particleSystemRef == null || playerCollider == null)
+        {
+            return;
+        }
+
+        var trigger = particleSystemRef.trigger;
+        if (!trigger.enabled)
+        {
+            trigger.enabled = true;
+        }
+
+        trigger.SetCollider(0, playerCollider);
     }
 }
