@@ -37,12 +37,26 @@ public class SmokeHealthReceiver : MonoBehaviour
 
     public void TakeSmokeDamage(float damageAmount)
     {
+        ApplyEnvironmentalDamage(damageAmount, ignoreWhenCrouched: true, sourceLabel: "Smoke");
+    }
+
+    public void TakeFlameDamage(float damageAmount)
+    {
+        ApplyEnvironmentalDamage(damageAmount, ignoreWhenCrouched: false, sourceLabel: "Flame");
+    }
+
+    private void ApplyEnvironmentalDamage(
+        float damageAmount,
+        bool ignoreWhenCrouched,
+        string sourceLabel
+    )
+    {
         if (damageAmount <= 0f || gameOverLogged)
         {
             return;
         }
 
-        if (immuneToSmokeWhileCrouched && IsPlayerCrouched())
+        if (ignoreWhenCrouched && immuneToSmokeWhileCrouched && IsPlayerCrouched())
         {
             return;
         }
@@ -56,7 +70,7 @@ public class SmokeHealthReceiver : MonoBehaviour
             bool? isCrouched = TryGetCrouchedState();
 
             Debug.Log(
-                $"[SmokeHealthReceiver] Damage={damageAmount:F3} | Health={health:F2} | CharacterController.height={ccHeight:F2} | CapsuleCollider.height={capsuleHeight:F2} | IsCrouched={isCrouched?.ToString() ?? "unknown"}"
+                $"[SmokeHealthReceiver] Source={sourceLabel} | Damage={damageAmount:F3} | Health={health:F2} | CharacterController.height={ccHeight:F2} | CapsuleCollider.height={capsuleHeight:F2} | IsCrouched={isCrouched?.ToString() ?? "unknown"}"
             );
         }
 

@@ -8,14 +8,20 @@ public class SmokeVisionEffect : MonoBehaviour
     [SerializeField] private float riseSpeed = 6f;
     [SerializeField] private float decaySpeed = 2f;
 
-    [Header("Visual Strength")]
+    [Header("Smoke Visual Strength")]
     [SerializeField] private float maxFogAlpha = 0.35f;
     [SerializeField] private float maxVignetteAlpha = 0.7f;
+    
+    [Header("Flame Visual Strength")]
+    [SerializeField] private float maxFlameTintAlpha = 0.35f;
 
     private Image fogImage;
     private Image vignetteImage;
-    private float targetExposure;
-    private float currentExposure;
+    private Image flameTintImage;
+    private float smokeTargetExposure;
+    private float smokeCurrentExposure;
+    private float flameTargetExposure;
+    private float flameCurrentExposure;
 
     private void Awake()
     {
@@ -24,13 +30,31 @@ public class SmokeVisionEffect : MonoBehaviour
 
     private void Update()
     {
-        targetExposure = Mathf.MoveTowards(targetExposure, 0f, decaySpeed * Time.deltaTime);
-        float speed = currentExposure < targetExposure ? riseSpeed : decaySpeed;
-        currentExposure = Mathf.MoveTowards(currentExposure, targetExposure, speed * Time.deltaTime);
-        ApplyExposure(currentExposure);
+        smokeTargetExposure = Mathf.MoveTowards(smokeTargetExposure, 0f, decaySpeed * Time.deltaTime);
+        float smokeSpeed = smokeCurrentExposure < smokeTargetExposure ? riseSpeed : decaySpeed;
+        smokeCurrentExposure = Mathf.MoveTowards(
+            smokeCurrentExposure,
+            smokeTargetExposure,
+            smokeSpeed * Time.deltaTime
+        );
+
+        flameTargetExposure = Mathf.MoveTowards(flameTargetExposure, 0f, decaySpeed * Time.deltaTime);
+        float flameSpeed = flameCurrentExposure < flameTargetExposure ? riseSpeed : decaySpeed;
+        flameCurrentExposure = Mathf.MoveTowards(
+            flameCurrentExposure,
+            flameTargetExposure,
+            flameSpeed * Time.deltaTime
+        );
+
+        ApplyExposure(smokeCurrentExposure, flameCurrentExposure);
     }
 
     public void SetParticleExposure(int insideParticleCount)
+    {
+        SetSmokeExposure(insideParticleCount);
+    }
+
+    public void SetSmokeExposure(int insideParticleCount)
     {
         if (insideParticleCount <= 0)
         {
@@ -38,7 +62,17 @@ public class SmokeVisionEffect : MonoBehaviour
         }
 
         float normalized = Mathf.Clamp01(insideParticleCount / Mathf.Max(1f, particlesForFullEffect));
-        targetExposure = Mathf.Max(targetExposure, normalized);
+        smokeTargetExposure = Mathf.Max(smokeTargetExposure, normalized);
+    }
+
+    public void SetFlameExposure01(float normalizedExposure)
+    {
+        if (normalizedExposure <= 0f)
+        {
+            return;
+        }
+
+        flameTargetExposure = Mathf.Max(flameTargetExposure, Mathf.Clamp01(normalizedExposure));
     }
 
     private void CreateOverlay()
@@ -59,6 +93,9 @@ public class SmokeVisionEffect : MonoBehaviour
         vignetteImage.sprite = CreateVignetteSprite();
         vignetteImage.type = Image.Type.Simple;
         vignetteImage.color = new Color(0.45f, 0.45f, 0.45f, 0f);
+
+        flameTintImage = CreateFullscreenImage(canvasGO.transform, "FlameTint");
+        flameTintImage.color = new Color(0.95f, 0.12f, 0.06f, 0f);
     }
 
     private static Image CreateFullscreenImage(Transform parent, string name)
@@ -73,20 +110,27 @@ public class SmokeVisionEffect : MonoBehaviour
         return go.AddComponent<Image>();
     }
 
-    private void ApplyExposure(float exposure)
+    private void ApplyExposure(float smokeExposure, float flameExposure)
     {
         if (fogImage != null)
         {
             Color c = fogImage.color;
-            c.a = exposure * maxFogAlpha;
+            c.a = smokeExposure * maxFogAlpha;
             fogImage.color = c;
         }
 
         if (vignetteImage != null)
         {
             Color c = vignetteImage.color;
-            c.a = exposure * maxVignetteAlpha;
+            c.a = smokeExposure * maxVignetteAlpha;
             vignetteImage.color = c;
+        }
+
+        if (flameTintImage != null)
+        {
+            Color c = flameTintImage.color;
+            c.a = flameExposure * maxFlameTintAlpha;
+            flameTintImage.color = c;
         }
     }
 

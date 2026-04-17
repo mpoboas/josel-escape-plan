@@ -4,6 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(ParticleSystem))]
 public class SmokeDamageTrigger : MonoBehaviour
 {
+    [Header("Smoke Damage")]
     [SerializeField] private bool applySmokeDamageToPlayer = false;
     [SerializeField] private SmokeHealthReceiver smokeHealthReceiver;
     [SerializeField] private SmokeVisionEffect smokeVisionEffect;
@@ -11,8 +12,15 @@ public class SmokeDamageTrigger : MonoBehaviour
     [SerializeField] private float baseDamagePerParticle = 1f;
     [SerializeField] private int initialBufferSize = 256;
 
+    [Header("Flame Damage")]
+    [SerializeField] private bool applyFlameDamageToPlayer = true;
+    [SerializeField] private float baseFlameDamagePerSecond = 20f;
+    [SerializeField] private float flameEffectRadius = 1.35f;
+
     private ParticleSystem particleSystemRef;
     private List<ParticleSystem.Particle> insideParticles;
+    private Transform playerTransform;
+    private readonly List<Transform> flameSources = new List<Transform>(4);
 
     public void Configure(SmokeHealthReceiver receiver, float damagePerParticle = -1f)
     {
@@ -30,7 +38,9 @@ public class SmokeDamageTrigger : MonoBehaviour
         TryResolveReceiver();
         TryResolveVisionEffect();
         TryResolvePlayerCollider();
+        TryResolvePlayerTransform();
         EnsureTriggerColliderAssigned();
+        ScanFlameSources();
     }
 
     private void OnParticleTrigger()
@@ -63,7 +73,7 @@ public class SmokeDamageTrigger : MonoBehaviour
 
         if (smokeVisionEffect != null)
         {
-            smokeVisionEffect.SetParticleExposure(insideCount);
+            smokeVisionEffect.SetSmokeExposure(insideCount);
         }
 
         if (!applySmokeDamageToPlayer)
@@ -84,6 +94,31 @@ public class SmokeDamageTrigger : MonoBehaviour
         smokeHealthReceiver.TakeSmokeDamage(damage);
     }
 
+    private void Update()
+    {
+        if (playerTransform == null)
+        {
+            TryResolvePlayerTransform();
+        }
+
+        if (smokeVisionEffect == null)
+        {
+            TryResolveVisionEffect();
+        }
+
+        if (smokeHealthReceiver == null)
+        {
+            TryResolveReceiver();
+        }
+
+        if (flameSources.Count == 0)
+        {
+            ScanFlameSources();
+        }
+
+        ApplyFlameHazard();
+    }
+
     private void TryResolveReceiver()
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -99,6 +134,20 @@ public class SmokeDamageTrigger : MonoBehaviour
         if (player != null)
         {
             smokeVisionEffect = player.GetComponent<SmokeVisionEffect>();
+        }
+    }
+
+    private void TryResolvePlayerTransform()
+    {
+        if (playerTransform != null)
+        {
+            return;
+        }
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            playerTransform = player.transform;
         }
     }
 
@@ -136,5 +185,79 @@ public class SmokeDamageTrigger : MonoBehaviour
         }
 
         trigger.SetCollider(0, playerCollider);
+    }
+
+    private void ScanFlameSources()
+    {
+        flameSources.Clear();
+
+        Transform root = transform.root;
+        if (root == null)
+        {
+            return;
+        }
+
+        ParticleSystem[] allSystems = root.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < allSystems.Length; i++)
+        {
+            ParticleSystem ps = allSystems[i];
+            if (ps == null || ps == particleSystemRef)
+            {
+                continue;
+            }
+
+            if (!ps.name.ToLowerInvariant().Contains("flame"))
+            {
+                continue;
+            }
+
+            flameSources.Add(ps.transform);
+        }
+    }
+
+    private void ApplyFlameHazard()
+    {
+        if (playerTransform == null || flameSources.Count == 0)
+        {
+            return;
+        }
+
+        float nearestDistance = float.PositiveInfinity;
+        for (int i = 0; i < flameSources.Count; i++)
+        {
+            Transform source = flameSources[i];
+            if (source == null)
+            {
+                continue;
+            }
+
+            float distance = Vector3.Distance(playerTransform.position, source.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+            }
+        }
+
+        if (!float.IsFinite(nearestDistance) || flameEffectRadius <= 0f)
+        {
+            return;
+        }
+
+        float normalizedExposure = Mathf.Clamp01(1f - (nearestDistance / flameEffectRadius));
+        if (normalizedExposure <= 0f)
+        {
+            return;
+        }
+
+        if (smokeVisionEffect != null)
+        {
+            smokeVisionEffect.SetFlameExposure01(normalizedExposure);
+        }
+
+        if (applyFlameDamageToPlayer && smokeHealthReceiver != null)
+        {
+            float flameDamage = baseFlameDamagePerSecond * normalizedExposure * Time.deltaTime;
+            smokeHealthReceiver.TakeFlameDamage(flameDamage);
+        }
     }
 }
