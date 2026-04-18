@@ -65,5 +65,25 @@ namespace BuildingSystem
             go.transform.localRotation = Quaternion.identity;
             return go.transform;
         }
+
+        /// <summary>
+        /// Returns <c>Floor {floorLevel} / Signage</c>, creating the <c>Signage</c> empty if missing.
+        /// Place <c>MapSignagePlacement</c> markers under this transform.
+        /// </summary>
+        public Transform GetOrCreateSignageParent(int floorLevel)
+        {
+            Transform floor = GetFloorParent(floorLevel);
+            const string signageName = "Signage";
+            Transform existing = floor.Find(signageName);
+            if (existing != null)
+                return existing;
+
+            GameObject go = new GameObject(signageName);
+            go.transform.SetParent(floor, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = Vector3.one;
+            return go.transform;
+        }
     }
 }

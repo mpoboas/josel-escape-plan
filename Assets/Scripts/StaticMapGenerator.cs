@@ -68,6 +68,37 @@ public class StaticMapGenerator : MonoBehaviour
         s_Runner = null;
     }
 
+    private const string SignageTag = "Signage";
+
+    /// <summary>World-space signage is editor-only visibility; hide for the player as soon as the play scene loads.</summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void HideTaggedSignageAfterSceneLoad()
+    {
+        if (!Application.isPlaying)
+            return;
+        SetAllTaggedSignageRenderersEnabled(false);
+    }
+
+    private static void SetAllTaggedSignageRenderersEnabled(bool enabled)
+    {
+        try
+        {
+            var roots = GameObject.FindGameObjectsWithTag(SignageTag);
+            for (int i = 0; i < roots.Length; i++)
+            {
+                var go = roots[i];
+                if (go == null)
+                    continue;
+                foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                    r.enabled = enabled;
+            }
+        }
+        catch (UnityException)
+        {
+            // Tag not defined in this project build.
+        }
+    }
+
     /// <summary>Runs before default scripts so voxel smoke can be disabled before <see cref="SmokeSimulator"/> submits draws this frame.</summary>
     [DefaultExecutionOrder(-10000)]
     private sealed class CaptureRunner : MonoBehaviour
@@ -233,6 +264,9 @@ public class StaticMapGenerator : MonoBehaviour
             mapCamera.gameObject.SetActive(true);
             mapCamera.enabled = true;
 
+            if (Application.isPlaying)
+                SetAllTaggedSignageRenderersEnabled(true);
+
             if (excludeFireAndSmokeFromMap)
                 PushFireAndSmokeSuppression(vfxFireStates, vfxSmokeStates);
 
@@ -260,6 +294,9 @@ public class StaticMapGenerator : MonoBehaviour
         {
             if (excludeFireAndSmokeFromMap)
                 PopFireAndSmokeSuppression(vfxFireStates, vfxSmokeStates);
+
+            if (Application.isPlaying)
+                SetAllTaggedSignageRenderersEnabled(false);
 
             SetBoardVisualsForCapture(true);
 

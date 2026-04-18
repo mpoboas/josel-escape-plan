@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46ffd64427201d643ac3e2905227ddcf, type: 3}
+  m_Name: SignageCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::SignageCatalog
+  entries:
+  - displayName: exit_down
+    sprite: {fileID: 21300000, guid: 49722c9ecc59a7847998c1492a7328ab, type: 3}
+  - displayName: exit_left
+    sprite: {fileID: 21300000, guid: f6ccc0a59a3fbbe4391b882075b53afe, type: 3}
+  - displayName: exit_right
+    sprite: {fileID: 21300000, guid: a8bdb91778dbc5840a80394408e7a74b, type: 3}
+  - displayName: exit_up
+    sprite: {fileID: 21300000, guid: 47e9726e18826744887b94f430f613b5, type: 3}
+  - displayName: fire_extinguisher
+    sprite: {fileID: 21300000, guid: 61f9ca4963ebcdc41a0cf20be4e5bc53, type: 3}
+  - displayName: stairs_down_right
+    sprite: {fileID: 21300000, guid: c00f56f2613efe246bd47a780a5d657e, type: 3}
+  - displayName: stairs_up_right
+    sprite: {fileID: 21300000, guid: 3b85d523f9daa234386225322580e303, type: 3}
+  - displayName: stair_down_left
+    sprite: {fileID: 21300000, guid: a64f1a35fabd4ef4cbd404fe2152637f, type: 3}
+  - displayName: stair_up_left
+    sprite: {fileID: 21300000, guid: 051ecb3dd6a2de54a9d498d74afacda9, type: 3}
+  - displayName: you_are_here
+    sprite: {fileID: 21300000, guid: 29dd1238d7f62544dbcb1991ef2c6273, type: 3}
