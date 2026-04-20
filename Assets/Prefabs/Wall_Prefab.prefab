@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 9115510641068287930}
   - component: {fileID: 1763700924561373142}
   - component: {fileID: 5717660012655771078}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Wall_Prefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -121,6 +121,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 5cc30f0052c2b481ca3f92584af10003, type: 3}
       propertyPath: m_Name
       value: wall
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 5cc30f0052c2b481ca3f92584af10003, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

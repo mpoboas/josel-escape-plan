@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7681445510549492111}
   - component: {fileID: 6298114164109418024}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: outro collider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -64,7 +64,7 @@ GameObject:
   - component: {fileID: 4925984315581001005}
   - component: {fileID: 1528597747968180160}
   - component: {fileID: 7204381904625829592}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Stairs_Prefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -136,7 +136,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3525077974018630059}
   - component: {fileID: 9206811670396442063}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Collider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -230,6 +230,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 3f8490018c030486ba6ee149efb0bf13, type: 3}
       propertyPath: m_Name
       value: stairs
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 3f8490018c030486ba6ee149efb0bf13, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
