@@ -68,6 +68,7 @@ public class StaticMapGenerator : MonoBehaviour
     }
 
     private const string SignageTag = "Signage";
+    private const string BuildingLayerName = "Building";
 
     /// <summary>World-space signage is editor-only visibility; hide for the player as soon as the play scene loads.</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -229,11 +230,15 @@ public class StaticMapGenerator : MonoBehaviour
         RenderTexture rt = null;
         var previousTarget = mapCamera.targetTexture;
         var wasCamEnabled = mapCamera.enabled;
+        var previousCullingMask = mapCamera.cullingMask;
+        var previousUseOcclusionCulling = mapCamera.useOcclusionCulling;
 
         SetBoardVisualsForCapture(false);
 
         var vfxFireStates = new List<(GameObject go, bool active)>(8);
         var vfxSmokeStates = new List<(SmokeSimulator sim, bool wasEnabled)>(4);
+        var forcedLayerStates = new List<(GameObject go, int layer)>(64);
+        var floorCullerStates = new List<(BuildingRuntimeFloorCuller culler, bool wasEnabled)>(4);
 
         try
         {
@@ -262,6 +267,23 @@ public class StaticMapGenerator : MonoBehaviour
             mapCamera.targetTexture = rt;
             mapCamera.gameObject.SetActive(true);
             mapCamera.enabled = true;
+
+            // Restrict the capture to Building layer, but include Signage by temporarily forcing it to that layer.
+            int buildingLayer = LayerMask.NameToLayer(BuildingLayerName);
+            if (buildingLayer >= 0)
+            {
+                mapCamera.cullingMask = 1 << buildingLayer;
+                // Signage must always be visible even if it is not authored on Building.
+                PushSignageLayersToBuilding(forcedLayerStates, buildingLayer);
+            }
+            else
+            {
+                Debug.LogWarning("[StaticMapGenerator] Layer \"Building\" not found; using camera culling mask as-is.", this);
+            }
+
+            // Top-down map captures should not be affected by runtime occlusion or vertical floor streaming.
+            mapCamera.useOcclusionCulling = false;
+            PushFloorCullerSuppression(floorCullerStates);
 
             if (Application.isPlaying)
                 SetAllTaggedSignageRenderersEnabled(true);
@@ -301,7 +323,12 @@ public class StaticMapGenerator : MonoBehaviour
 
             mapCamera.targetTexture = previousTarget;
             mapCamera.enabled = wasCamEnabled;
+            mapCamera.cullingMask = previousCullingMask;
+            mapCamera.useOcclusionCulling = previousUseOcclusionCulling;
             mapCamera.gameObject.SetActive(false); // Snap & Sleep: camera off after shot
+
+            RestoreForcedLayers(forcedLayerStates);
+            PopFloorCullerSuppression(floorCullerStates);
 
             if (rt != null)
             {
@@ -339,6 +366,83 @@ public class StaticMapGenerator : MonoBehaviour
             if (g.youAreHereMarker != null)
                 g.youAreHereMarker.gameObject.SetActive(false);
         }
+    }
+
+    private static void PushHierarchyLayersToBuilding(
+        List<(GameObject go, int layer)> states,
+        HashSet<GameObject> visited,
+        Transform root,
+        int buildingLayer)
+    {
+        if (root == null)
+            return;
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (t == null || t.gameObject == null)
+                continue;
+            if (!visited.Add(t.gameObject))
+                continue;
+
+            states.Add((t.gameObject, t.gameObject.layer));
+            t.gameObject.layer = buildingLayer;
+        }
+    }
+
+    private static void PushSignageLayersToBuilding(
+        List<(GameObject go, int layer)> states,
+        int buildingLayer)
+    {
+        var visited = new HashSet<GameObject>();
+        try
+        {
+            var taggedRoots = GameObject.FindGameObjectsWithTag(SignageTag);
+            for (int i = 0; i < taggedRoots.Length; i++)
+                PushHierarchyLayersToBuilding(states, visited, taggedRoots[i]?.transform, buildingLayer);
+        }
+        catch (UnityException)
+        {
+            // Tag not defined in this project build.
+        }
+
+        var placements = FindObjectsByType<MapSignagePlacement>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < placements.Length; i++)
+            PushHierarchyLayersToBuilding(states, visited, placements[i]?.transform, buildingLayer);
+    }
+
+    private static void RestoreForcedLayers(List<(GameObject go, int layer)> states)
+    {
+        for (int i = states.Count - 1; i >= 0; i--)
+        {
+            var (go, layer) = states[i];
+            if (go != null)
+                go.layer = layer;
+        }
+        states.Clear();
+    }
+
+    private static void PushFloorCullerSuppression(List<(BuildingRuntimeFloorCuller culler, bool wasEnabled)> states)
+    {
+        states.Clear();
+        var cullers = FindObjectsByType<BuildingRuntimeFloorCuller>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < cullers.Length; i++)
+        {
+            var c = cullers[i];
+            if (c == null)
+                continue;
+            states.Add((c, c.enabled));
+            c.enabled = false;
+        }
+    }
+
+    private static void PopFloorCullerSuppression(List<(BuildingRuntimeFloorCuller culler, bool wasEnabled)> states)
+    {
+        for (int i = states.Count - 1; i >= 0; i--)
+        {
+            var (c, wasEnabled) = states[i];
+            if (c != null)
+                c.enabled = wasEnabled;
+        }
+        states.Clear();
     }
 
     /// <summary>
