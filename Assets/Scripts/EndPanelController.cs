@@ -15,6 +15,12 @@ public class EndPanelController : MonoBehaviour
     [Tooltip("Name of the game scene (where GameManager logic resides).")]
     public string gameSceneName = "B";
 
+    private void Awake()
+    {
+        // Ensures the panel starts hidden when the game runs
+        gameObject.SetActive(false);
+    }
+
     [Header("Stats Text (auto-resolved by default)")]
     public TMP_Text timeText;
     public TMP_Text smokeDamageText;
@@ -128,7 +134,7 @@ public class EndPanelController : MonoBehaviour
         int total = Mathf.Max(0, Mathf.RoundToInt(seconds));
         int mins = total / 60;
         int secs = total % 60;
-        return $"{mins} mins, {secs} secs";
+        return $"{mins}:{secs}";
     }
 
     /// <summary>
@@ -138,6 +144,7 @@ public class EndPanelController : MonoBehaviour
     public void NextLevel()
     {
         int currentLevel = PlayerPrefs.GetInt("SelectedLevel", 0);
+        Debug.Log($"[EndPanel] Current level: {currentLevel}");
         PlayerPrefs.SetInt("SelectedLevel", currentLevel + 1);
         PlayerPrefs.Save();
 
