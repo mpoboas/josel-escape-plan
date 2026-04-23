@@ -3,20 +3,20 @@ using UnityEngine;
 public static class CarryableBoxBootstrapper
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void EnsureSceneBoxesAreCarryable()
+    private static void EnsureMarkedBoxesAreCarryable()
     {
-        Transform[] allTransforms = Object.FindObjectsByType<Transform>(FindObjectsSortMode.None);
-        for (int i = 0; i < allTransforms.Length; i++)
+        MovableBoxObject[] movableBoxes = Object.FindObjectsByType<MovableBoxObject>(FindObjectsSortMode.None);
+        for (int i = 0; i < movableBoxes.Length; i++)
         {
-            Transform tr = allTransforms[i];
-            if (!string.Equals(tr.name, "Box", System.StringComparison.OrdinalIgnoreCase))
+            MovableBoxObject movable = movableBoxes[i];
+            if (movable == null)
             {
                 continue;
             }
 
-            if (tr.GetComponent<CarryableBox>() == null)
+            if (movable.GetComponent<CarryableBox>() == null)
             {
-                tr.gameObject.AddComponent<CarryableBox>();
+                movable.gameObject.AddComponent<CarryableBox>();
             }
         }
     }

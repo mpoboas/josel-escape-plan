@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -14,6 +15,9 @@ public class LevelData
 
     [Tooltip("Doors that should be hot to the touch in this level.")]
     public DoorController[] hotDoors;
+
+    [Tooltip("Parent GameObjects that contain the box setup for this level. Assign empty roots with Box children here.")]
+    public GameObject[] boxGroupRoots;
 }
 
 /// <summary>
@@ -48,6 +52,8 @@ public class GameManager : MonoBehaviour
         }
 
         LevelData currentLevel = levels[selectedLevel];
+
+        ConfigureLevelBoxGroups(selectedLevel);
 
         // // 4. Teleport Player
         // if (player != null && currentLevel.playerSpawnPoint != null)
@@ -108,6 +114,49 @@ public class GameManager : MonoBehaviour
                     Debug.Log("Door is indeed hot", door);
                     door.isHot = true;
                 }
+            }
+        }
+    }
+
+    private void ConfigureLevelBoxGroups(int selectedLevel)
+    {
+        HashSet<GameObject> allConfiguredGroups = new HashSet<GameObject>();
+
+        for (int i = 0; i < levels.Length; i++)
+        {
+            GameObject[] groups = levels[i].boxGroupRoots;
+            if (groups == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < groups.Length; j++)
+            {
+                GameObject group = groups[j];
+                if (group != null)
+                {
+                    allConfiguredGroups.Add(group);
+                }
+            }
+        }
+
+        foreach (GameObject group in allConfiguredGroups)
+        {
+            group.SetActive(false);
+        }
+
+        GameObject[] activeGroups = levels[selectedLevel].boxGroupRoots;
+        if (activeGroups == null || activeGroups.Length == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < activeGroups.Length; i++)
+        {
+            GameObject group = activeGroups[i];
+            if (group != null)
+            {
+                group.SetActive(true);
             }
         }
     }

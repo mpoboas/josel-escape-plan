@@ -284,29 +284,19 @@ public class PlayerInteraction : MonoBehaviour
             return null;
         }
 
-        CarryableBox existing = hitCollider.GetComponentInParent<CarryableBox>();
+        MovableBoxObject movableBox = hitCollider.GetComponentInParent<MovableBoxObject>();
+        if (movableBox == null)
+        {
+            return null;
+        }
+
+        CarryableBox existing = movableBox.GetComponent<CarryableBox>();
         if (existing != null)
         {
             return existing;
         }
 
-        Transform candidate = hitCollider.transform;
-        while (candidate != null)
-        {
-            if (string.Equals(candidate.name, "Box", System.StringComparison.OrdinalIgnoreCase))
-            {
-                if (candidate.GetComponentInParent<DoorController>() != null)
-                {
-                    return null;
-                }
-
-                return candidate.gameObject.AddComponent<CarryableBox>();
-            }
-
-            candidate = candidate.parent;
-        }
-
-        return null;
+        return movableBox.gameObject.AddComponent<CarryableBox>();
     }
 
     private bool HandleCarriedBoxInput()
