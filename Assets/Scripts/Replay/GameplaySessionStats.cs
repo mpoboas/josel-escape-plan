@@ -31,6 +31,7 @@ public sealed class GameplaySessionStats : MonoBehaviour
 
     private readonly List<ReplayEvent> _events = new List<ReplayEvent>(256);
     private readonly HashSet<int> _heatCheckedDoorIds = new HashSet<int>();
+    private readonly HashSet<int> _openedDoorIds = new HashSet<int>();
 
     private float _sessionStartTime;
     private float _lastFireEventTime = -999f;
@@ -41,6 +42,8 @@ public sealed class GameplaySessionStats : MonoBehaviour
     public int DoorOpenActions { get; private set; }
     public int DoorCloseActions { get; private set; }
     public int HeatCheckedDoorCount => _heatCheckedDoorIds.Count;
+    public int OpenedDoorCount => _openedDoorIds.Count;
+    public HashSet<int> OpenedDoorIdsSet => _openedDoorIds; // Access to check states later
     public float ElapsedSeconds => Mathf.Max(0f, Time.time - _sessionStartTime);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -84,6 +87,7 @@ public sealed class GameplaySessionStats : MonoBehaviour
     {
         _events.Clear();
         _heatCheckedDoorIds.Clear();
+        _openedDoorIds.Clear();
         SmokeDamageTaken = 0f;
         FireDamageTaken = 0f;
         DoorOpenActions = 0;
@@ -120,9 +124,14 @@ public sealed class GameplaySessionStats : MonoBehaviour
             return;
 
         if (isOpenNow)
+        {
             DoorOpenActions++;
+            _openedDoorIds.Add(door.GetInstanceID());
+        }
         else
+        {
             DoorCloseActions++;
+        }
 
         AddEvent(isOpenNow ? ReplayEventKind.DoorOpened : ReplayEventKind.DoorClosed, worldPos, ElapsedSeconds);
     }

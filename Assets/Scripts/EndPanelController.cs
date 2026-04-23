@@ -57,6 +57,9 @@ public class EndPanelController : MonoBehaviour
     {
         Debug.Log($"[EndPanel] Show() called. reachedGoal={reachedGoal}, activate={activateGameObject}");
 
+        var stats = GameplaySessionStats.Instance;
+        if (stats == null) return;
+
         _shown = true;
         ResolveUIReferences();
 
@@ -67,6 +70,21 @@ public class EndPanelController : MonoBehaviour
 
         Time.timeScale = 0f;
 
+        // Check for time effectiveness
+        float targetTime = 9999f;
+        var gm = FindAnyObjectByType<GameManager>();
+        if (gm != null && gm.levels != null)
+        {
+            int currentLevelIndex = PlayerPrefs.GetInt("SelectedLevel", 0);
+            if (currentLevelIndex >= 0 && currentLevelIndex < gm.levels.Length)
+            {
+                targetTime = gm.levels[currentLevelIndex].targetTimeSeconds;
+            }
+        }
+
+        float actualTime = stats.ElapsedSeconds;
+        bool timingOk = actualTime <= targetTime;
+
         // Unlock and show cursor for button interaction
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -75,21 +93,27 @@ public class EndPanelController : MonoBehaviour
         if (nextButton != null)
         {
             bool hasNextLevel = true;
-            var gm = FindAnyObjectByType<GameManager>();
             if (gm != null && gm.levels != null)
             {
                 int currentLevelIndex = PlayerPrefs.GetInt("SelectedLevel", 0);
                 hasNextLevel = (currentLevelIndex + 1) < gm.levels.Length;
             }
 
-            // Only interactable if player reached the goal AND there is a next level
-            nextButton.interactable = reachedGoal && hasNextLevel;
+            // Only interactable if player reached the goal AND timing was OK AND there is a next level
+            nextButton.interactable = reachedGoal && timingOk && hasNextLevel;
         }
 
         // Update status text
         if (gameText != null)
         {
-            gameText.text = reachedGoal ? "Successful Escape" : "You Died";
+            if (!reachedGoal)
+            {
+                gameText.text = "You Died";
+            }
+            else
+            {
+                gameText.text = timingOk ? "Successful Evacuation" : "Ineffective-Evacuation";
+            }
         }
 
         RefreshStatsUI();
@@ -144,33 +168,34 @@ public class EndPanelController : MonoBehaviour
         SetTmpText(smokeDamageText, Mathf.RoundToInt(stats.SmokeDamageTaken).ToString());
         SetTmpText(fireDamageText, Mathf.RoundToInt(stats.FireDamageTaken).ToString());
 
-        var doors = FindObjectsByType<DoorController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        int totalDoors = 0;
-        int currentlyOpen = 0;
-        int hotDoors = 0;
-        int hotChecked = 0;
-        for (int i = 0; i < doors.Length; i++)
-        {
-            var d = doors[i];
-            if (d == null)
-                continue;
-            totalDoors++;
-            if (d.IsOpen)
-                currentlyOpen++;
+        // DOOR STATS CALCULATION
+        int totalOpened = stats.OpenedDoorCount;
+        int currentlyClosedThatWereOpened = 0;
+        int totalChecked = stats.HeatCheckedDoorCount;
 
-            if (d.isHot)
+        // We find all doors to see their current state
+        var allDoors = FindObjectsByType<DoorController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var openedIds = stats.OpenedDoorIdsSet;
+
+        foreach (var door in allDoors)
+        {
+            if (door == null) continue;
+            
+            // If this specific door was opened at some point during the session
+            if (openedIds.Contains(door.GetInstanceID()))
             {
-                hotDoors++;
-                if (d.HasBeenInspected)
-                    hotChecked++;
+                // And if it is currently closed
+                if (!door.IsOpen)
+                {
+                    currentlyClosedThatWereOpened++;
+                }
             }
         }
 
-        int openedActions = stats.DoorOpenActions;
-        int currentlyNotClosed = currentlyOpen;
-        int hotNotChecked = Mathf.Max(0, hotDoors - hotChecked);
-        SetTmpText(doorsClosedText, $"{openedActions} / {currentlyNotClosed}");
-        SetTmpText(doorsCheckedText, $"{hotChecked} / {hotNotChecked}");
+        // Display results: (Closed Doors / Total Opened) and (Checked Doors / Total Opened)
+        // If 0 were opened, we show 0/0 to avoid confusion
+        SetTmpText(doorsClosedText, $"{currentlyClosedThatWereOpened} / {totalOpened}");
+        SetTmpText(doorsCheckedText, $"{totalChecked} / {totalOpened}");
     }
 
     private void ResolveUIReferences()

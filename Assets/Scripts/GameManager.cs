@@ -16,6 +16,9 @@ public class LevelData
     [Tooltip("Doors that should be hot to the touch in this level.")]
     public DoorController[] hotDoors;
 
+    [Tooltip("Target time to complete the level for a 'Successful Evacuation' (in seconds).")]
+    public float targetTimeSeconds;
+
     [Tooltip("Parent GameObjects that contain the box setup for this level. Assign empty roots with Box children here.")]
     public GameObject[] boxGroupRoots;
 }
