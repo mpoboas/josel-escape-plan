@@ -42,6 +42,10 @@ public class PlayerInteraction : MonoBehaviour
              "Assign in the Inspector; leave empty to skip.")]
     public Text interactPrompt;   // swap for TMP_Text if you use TextMeshPro
 
+    [Header("Box Prompt UI")]
+    [SerializeField] private Text boxLookPrompt;
+    [SerializeField] private Text boxCarryPrompt;
+
     [Tooltip("Componente InspectUI para mostrar o toast de inspeção.")]
     public InspectUI inspectUI;
 
@@ -60,11 +64,18 @@ public class PlayerInteraction : MonoBehaviour
     private IInteractable _currentTarget;
     private Coroutine _heatInspectRoutine;
     private bool _heatInspectChannelRunning;
+    private CarryableBox _carriedBox;
+    private bool _throwChargeActive;
+    private float _throwChargeStartTimeUnscaled;
 
     // ───────────────────────────────────────────────────────────────────
 
     private void Awake()
     {
+        _currentTarget = null;
+        _carriedBox = null;
+        _throwChargeActive = false;
+
         if (playerCamera == null)
             playerCamera = Camera.main;
 
@@ -85,12 +96,23 @@ public class PlayerInteraction : MonoBehaviour
         heatInspectBarUi.AutoSetup(transform);
         heatInspectBarUi.Hide();
 
+        EnsureInteractPromptUi();
         // Hide prompt at startup
         SetPromptVisible(false);
+        SetupBoxPromptUi();
+        SetBoxLookPromptVisible(false);
+        SetBoxCarryPromptVisible(false);
     }
 
     private void OnDisable()
     {
+        _currentTarget = null;
+        _carriedBox = null;
+        _throwChargeActive = false;
+        SetPromptVisible(false);
+        SetBoxLookPromptVisible(false);
+        SetBoxCarryPromptVisible(false);
+
         if (_heatInspectRoutine != null)
         {
             StopCoroutine(_heatInspectRoutine);
@@ -105,11 +127,27 @@ public class PlayerInteraction : MonoBehaviour
     private void Update()
     {
         ScanForInteractable();
+        UpdateBoxPromptState();
+
+        if (HandleCarriedBoxInput())
+        {
+            return;
+        }
 
         if (_currentTarget != null)
         {
             if (Input.GetKeyDown(interactKey))
             {
+                if (_currentTarget is CarryableBox carryable)
+                {
+                    if (playerCamera != null && carryable.TryPickup(playerCamera.transform, transform))
+                    {
+                        _carriedBox = carryable;
+                        _throwChargeActive = false;
+                    }
+                    return;
+                }
+
                 handFeedback?.PlayGesture(PlayerHandFeedback.HandGestureKind.Interact);
                 _currentTarget.Interact();
             }
@@ -147,6 +185,13 @@ public class PlayerInteraction : MonoBehaviour
                 SetTarget(interactable);
                 return;
             }
+
+            CarryableBox carryable = ResolveCarryableBoxTarget(hit.collider);
+            if (carryable != null)
+            {
+                SetTarget(carryable);
+                return;
+            }
         }
 
         // Nothing found – clear target
@@ -161,7 +206,16 @@ public class PlayerInteraction : MonoBehaviour
 
         _currentTarget = target;
 
-        if (_currentTarget != null)
+        if (_carriedBox != null && _carriedBox.IsHeld)
+        {
+            return;
+        }
+
+        if (_currentTarget is CarryableBox)
+        {
+            SetPromptVisible(false);
+        }
+        else if (_currentTarget != null)
         {
             SetPromptText(_currentTarget.GetInteractText());
             SetPromptVisible(true);
@@ -221,6 +275,262 @@ public class PlayerInteraction : MonoBehaviour
             _heatInspectChannelRunning = false;
             _heatInspectRoutine = null;
         }
+    }
+
+    private CarryableBox ResolveCarryableBoxTarget(Collider hitCollider)
+    {
+        if (hitCollider == null)
+        {
+            return null;
+        }
+
+        CarryableBox existing = hitCollider.GetComponentInParent<CarryableBox>();
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        Transform candidate = hitCollider.transform;
+        while (candidate != null)
+        {
+            if (string.Equals(candidate.name, "Box", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (candidate.GetComponentInParent<DoorController>() != null)
+                {
+                    return null;
+                }
+
+                return candidate.gameObject.AddComponent<CarryableBox>();
+            }
+
+            candidate = candidate.parent;
+        }
+
+        return null;
+    }
+
+    private bool HandleCarriedBoxInput()
+    {
+        if (_carriedBox == null || !_carriedBox.IsHeld)
+        {
+            _carriedBox = null;
+            _throwChargeActive = false;
+            return false;
+        }
+
+        if (Input.GetKeyDown(interactKey))
+        {
+            _throwChargeActive = true;
+            _throwChargeStartTimeUnscaled = Time.unscaledTime;
+        }
+
+        if (_throwChargeActive && Input.GetKeyUp(interactKey))
+        {
+            float heldSeconds = Mathf.Max(0f, Time.unscaledTime - _throwChargeStartTimeUnscaled);
+            Vector3 forward = playerCamera != null ? playerCamera.transform.forward : transform.forward;
+            _carriedBox.Release(heldSeconds, forward);
+            handFeedback?.PlayGesture(PlayerHandFeedback.HandGestureKind.Interact);
+
+            _carriedBox = null;
+            _throwChargeActive = false;
+        }
+
+        return true;
+    }
+
+    private void SetupBoxPromptUi()
+    {
+        if (boxLookPrompt != null && boxCarryPrompt != null)
+        {
+            return;
+        }
+
+        Transform uiParent = interactPrompt != null ? interactPrompt.transform.parent : null;
+        Canvas hostCanvas = uiParent != null ? uiParent.GetComponentInParent<Canvas>() : null;
+
+        if (hostCanvas == null)
+        {
+            GameObject canvasGO = new GameObject("BoxPromptCanvas");
+            canvasGO.transform.SetParent(transform, false);
+            hostCanvas = canvasGO.AddComponent<Canvas>();
+            hostCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            hostCanvas.sortingOrder = 32000;
+            canvasGO.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasGO.AddComponent<GraphicRaycaster>().enabled = false;
+            uiParent = canvasGO.transform;
+        }
+        else if (uiParent == null)
+        {
+            uiParent = hostCanvas.transform;
+        }
+
+        if (boxLookPrompt == null)
+        {
+            boxLookPrompt = CreatePromptText(
+                uiParent,
+                "BoxLookPrompt",
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 34f),
+                24,
+                TextAnchor.MiddleCenter
+            );
+        }
+
+        if (boxCarryPrompt == null)
+        {
+            boxCarryPrompt = CreatePromptText(
+                uiParent,
+                "BoxCarryPrompt",
+                new Vector2(0.5f, 0.25f),
+                new Vector2(0.5f, 0.25f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                24,
+                TextAnchor.MiddleCenter
+            );
+        }
+    }
+
+    private void EnsureInteractPromptUi()
+    {
+        if (interactPrompt != null)
+        {
+            return;
+        }
+
+        Transform uiParent = null;
+        Canvas hostCanvas = GetComponentInChildren<Canvas>(true);
+        if (hostCanvas == null)
+        {
+            GameObject canvasGO = new GameObject("InteractionPromptCanvas");
+            canvasGO.transform.SetParent(transform, false);
+            hostCanvas = canvasGO.AddComponent<Canvas>();
+            hostCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            hostCanvas.sortingOrder = 32000;
+            canvasGO.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasGO.AddComponent<GraphicRaycaster>().enabled = false;
+            uiParent = canvasGO.transform;
+        }
+        else
+        {
+            uiParent = hostCanvas.transform;
+        }
+
+        interactPrompt = CreatePromptText(
+            uiParent,
+            "InteractPrompt",
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -30f),
+            24,
+            TextAnchor.MiddleCenter
+        );
+    }
+
+    private static Text CreatePromptText(
+        Transform parent,
+        string objectName,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 pivot,
+        Vector2 anchoredPosition,
+        int fontSize,
+        TextAnchor alignment
+    )
+    {
+        GameObject go = new GameObject(objectName);
+        go.transform.SetParent(parent, false);
+
+        RectTransform rect = go.AddComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = new Vector2(520f, 44f);
+
+        Text text = go.AddComponent<Text>();
+        text.font = LoadBuiltinUiFont();
+        text.fontSize = fontSize;
+        text.alignment = alignment;
+        text.color = Color.white;
+        text.raycastTarget = false;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        return text;
+    }
+
+    private static Font LoadBuiltinUiFont()
+    {
+        try
+        {
+            Font legacy = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (legacy != null)
+            {
+                return legacy;
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            Font arial = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            if (arial != null)
+            {
+                return arial;
+            }
+        }
+        catch
+        {
+        }
+
+        Font dynamic = Font.CreateDynamicFontFromOSFont("Arial", 16);
+        if (dynamic == null)
+        {
+            dynamic = Font.CreateDynamicFontFromOSFont("Helvetica", 16);
+        }
+        return dynamic;
+    }
+
+    private void UpdateBoxPromptState()
+    {
+        bool carryingBox = _carriedBox != null && _carriedBox.IsHeld;
+        bool aimingAtBox = !carryingBox && _currentTarget is CarryableBox;
+
+        SetBoxLookPromptVisible(aimingAtBox);
+        SetBoxCarryPromptVisible(carryingBox);
+    }
+
+    private void SetBoxLookPromptVisible(bool visible)
+    {
+        if (boxLookPrompt == null)
+        {
+            return;
+        }
+
+        if (visible)
+        {
+            boxLookPrompt.text = "Press \"E\" to pick up";
+        }
+        boxLookPrompt.gameObject.SetActive(visible);
+    }
+
+    private void SetBoxCarryPromptVisible(bool visible)
+    {
+        if (boxCarryPrompt == null)
+        {
+            return;
+        }
+
+        if (visible)
+        {
+            boxCarryPrompt.text = "Press \"E\" to drop";
+        }
+        boxCarryPrompt.gameObject.SetActive(visible);
     }
 
     // ── editor visualisation ────────────────────────────────────────────
