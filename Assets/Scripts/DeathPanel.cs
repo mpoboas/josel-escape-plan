@@ -42,12 +42,12 @@ public class DeathPanel : MonoBehaviour
             Die();
         }
 
-        // Se estiver morto, aguarda pelo Enter para carregar o menu principal
+        // Se estiver morto, aguarda pelo Enter para carregar o EndPanel
         if (isDead)
         {
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             {
-                ReturnToMainMenu();
+                TransitionToEndPanel();
             }
         }
     }
@@ -62,20 +62,38 @@ public class DeathPanel : MonoBehaviour
             deathPanelObject.SetActive(true);
         }
 
+        // Limpa efeitos visuais de fumo/fogo para o painel ficar legível
+        var visionEffect = Object.FindAnyObjectByType<SmokeVisionEffect>();
+        if (visionEffect != null)
+        {
+            visionEffect.ClearEffects();
+        }
+
         // Pára o tempo no jogo para interromper movimentação/fumo
         Time.timeScale = 0f;
 
-        // Opcional: Desbloquear e mostrar o cursor caso o Main Menu precise que o cursor esteja visível
+        // Desbloquear e mostrar o cursor
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
 
-    private void ReturnToMainMenu()
+    private void TransitionToEndPanel()
     {
-        // Restaura o tempo ao normal antes de trocar de cena
-        Time.timeScale = 1f;
+        // Desativa este painel
+        if (deathPanelObject != null)
+            deathPanelObject.SetActive(false);
 
-        // Carrega a cena do Menu Principal
-        SceneManager.LoadScene(mainMenuSceneName);
+        // Procura e ativa o EndPanel (o uGUI correto agora é o único EndPanelController na cena)
+        var endPanel = Object.FindAnyObjectByType<EndPanelController>(FindObjectsInactive.Include);
+        if (endPanel != null)
+        {
+            endPanel.gameObject.SetActive(true);
+            Debug.Log("[DeathPanel] Transitioned to EndPanel.");
+        }
+        else
+        {
+            Debug.LogError("[DeathPanel] EndPanelController not found. Loading menu as fallback.");
+            SceneManager.LoadScene(mainMenuSceneName);
+        }
     }
 }

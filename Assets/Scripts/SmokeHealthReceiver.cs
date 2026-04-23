@@ -8,6 +8,9 @@ public class SmokeHealthReceiver : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool logPostureInfoOnDamage = true;
     [SerializeField] private bool immuneToSmokeWhileCrouched = true;
+    
+    [Header("UI Reference")]
+    [SerializeField] private EndPanelController endPanelController;
 
     private CharacterController characterController;
     private CapsuleCollider capsuleCollider;
@@ -32,6 +35,16 @@ public class SmokeHealthReceiver : MonoBehaviour
                 "isCrouched",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
             );
+        }
+
+        if (endPanelController == null)
+        {
+            endPanelController = Object.FindAnyObjectByType<EndPanelController>(FindObjectsInactive.Include);
+            
+            if (endPanelController != null)
+                Debug.Log($"[SmokeHealthReceiver] Found EndPanelController on '{endPanelController.gameObject.name}'");
+            else
+                Debug.LogWarning("[SmokeHealthReceiver] Could not find EndPanelController in the scene!");
         }
     }
 
@@ -85,7 +98,22 @@ public class SmokeHealthReceiver : MonoBehaviour
         if (health <= 0f)
         {
             gameOverLogged = true;
-            Debug.Log("Game Over: Inalação de Fumo");
+            Debug.Log("[SmokeHealthReceiver] Player Died. Preparing EndPanel (hidden) and letting DeathPanel handle visuals.");
+            
+            // 1. Prepare the EndPanel (calculate stats) but keep it HIDDEN for now
+            if (endPanelController != null)
+            {
+                // false = reachedGoal (player died)
+                // false = activateGameObject (stay hidden until DeathPanel transition)
+                endPanelController.Show(false, false);
+            }
+            else
+            {
+                Debug.LogWarning("[SmokeHealthReceiver] EndPanelController not found to prepare stats.");
+            }
+
+            // Note: DeathPanel script handles its own activation in its Update loop 
+            // by checking playerHealth.health <= 0.
         }
     }
 

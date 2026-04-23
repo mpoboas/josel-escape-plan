@@ -157,6 +157,23 @@ public class SmokeVisionEffect : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Instantly clears all visual overlays (fog, vignette, flame tint).
+    /// </summary>
+    public void ClearEffects()
+    {
+        smokeTargetExposure = 0f;
+        smokeCurrentExposure = 0f;
+        flameTargetExposure = 0f;
+        flameCurrentExposure = 0f;
+        ApplyExposure(0f, 0f);
+        
+        if (fogImage != null && fogImage.canvas != null)
+        {
+            fogImage.canvas.enabled = false;
+        }
+    }
+
     private static Sprite CreateVignetteSprite()
     {
         const int size = 256;

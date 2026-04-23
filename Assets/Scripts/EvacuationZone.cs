@@ -20,7 +20,7 @@ public class EvacuationZone : MonoBehaviour
 
             if (endPanelController != null)
             {
-                endPanelController.Show();
+                endPanelController.Show(true);
             }
             else
             {
@@ -29,7 +29,8 @@ public class EvacuationZone : MonoBehaviour
                 
                 if (endPanelController != null)
                 {
-                    endPanelController.Show();
+                    Debug.Log($"[Evacuation] Found EndPanelController on '{endPanelController.gameObject.name}'");
+                    endPanelController.Show(true);
                 }
                 else
                 {
@@ -47,6 +48,13 @@ public class EvacuationZone : MonoBehaviour
         {
             Debug.LogWarning($"[Evacuation] Collider on {gameObject.name} was not a trigger. Fixing automatically.");
             col.isTrigger = true;
+        }
+
+        if (endPanelController == null)
+        {
+            endPanelController = Object.FindAnyObjectByType<EndPanelController>(FindObjectsInactive.Include);
+            if (endPanelController != null)
+                Debug.Log($"[Evacuation] Resolved EndPanelController to '{endPanelController.gameObject.name}'");
         }
     }
 }
