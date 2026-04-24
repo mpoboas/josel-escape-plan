@@ -245,12 +245,33 @@ public class EndPanelController : MonoBehaviour
         {
             scorePercentageText.text = $"{Mathf.RoundToInt(score)}";
         }
+
+        // --- Save Best Stats ---
+        int levelIndex = PlayerPrefs.GetInt("SelectedLevel", 0);
+        float savedBestScore = PlayerPrefs.GetFloat($"BestScore_Level_{levelIndex}", 0f);
+        
+        // Save if this is a new high score
+        if (score > savedBestScore)
+        {
+            PlayerPrefs.SetFloat($"BestScore_Level_{levelIndex}", score);
+        }
+
+        // Save best time only if the player successfully reached the goal
+        if (reachedGoal)
+        {
+            float savedBestTime = PlayerPrefs.GetFloat($"BestTime_Level_{levelIndex}", 999999f);
+            if (stats.ElapsedSeconds < savedBestTime)
+            {
+                PlayerPrefs.SetFloat($"BestTime_Level_{levelIndex}", stats.ElapsedSeconds);
+            }
+        }
+        PlayerPrefs.Save();
         // -------------------------------------------------------------
 
         RefreshStatsUI();
         EnsureMovementReplay();
 
-        Debug.Log($"[EndPanel] Panel displayed. Final Score: {score}%");
+        Debug.Log($"[EndPanel] Panel displayed. Final Score: {score}% | Best Score Saved: {Mathf.Max(score, savedBestScore)}%");
     }
 
     private void HideHUD()

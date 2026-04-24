@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using TMPro;
 
 public class MenuController : MonoBehaviour
 {
@@ -17,6 +18,10 @@ public class MenuController : MonoBehaviour
     [Header("Level Menu")]
     [Tooltip("The Play button inside the Level Menu. Starts disabled until a level is selected.")]
     public Button playLevelButton;
+
+    [Header("Level Stats")]
+    public TMP_Text bestScoreText;
+    public TMP_Text bestTimeText;
 
     [Header("Scene")]
     [Tooltip("Exact name of the Game Scene as registered in Build Settings.")]
@@ -93,16 +98,33 @@ public class MenuController : MonoBehaviour
     /// </summary>
     public void SelectLevel(int levelIndex)
     {
-        // Persist the selection so the Game Scene can read it with
-        // PlayerPrefs.GetInt("SelectedLevel", 0)
+        // Persist the selection
         PlayerPrefs.SetInt("SelectedLevel", levelIndex);
         PlayerPrefs.Save();
 
         Debug.Log($"[MenuController] Level {levelIndex} selected.");
 
+        // Update Best Stats UI
+        float bestScore = PlayerPrefs.GetFloat($"BestScore_Level_{levelIndex}", 0f);
+        float bestTime = PlayerPrefs.GetFloat($"BestTime_Level_{levelIndex}", 0f);
+
+        if (bestScoreText != null)
+            bestScoreText.text = bestScore > 0 ? $"Best Score: {Mathf.RoundToInt(bestScore)}%" : "Best Score: N/A";
+
+        if (bestTimeText != null)
+            bestTimeText.text = bestTime > 0 ? $"Best Time: {FormatTime(bestTime)}" : "Best Time: N/A";
+
         // Unlock the Play button now that a level has been chosen
         if (playLevelButton != null)
             playLevelButton.interactable = true;
+    }
+
+    private string FormatTime(float totalSeconds)
+    {
+        int total = Mathf.Max(0, Mathf.RoundToInt(totalSeconds));
+        int mins = total / 60;
+        int secs = total % 60;
+        return string.Format("{0:00}:{1:00}", mins, secs);
     }
 
     /// <summary>
