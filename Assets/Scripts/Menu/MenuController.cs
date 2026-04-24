@@ -27,6 +27,10 @@ public class MenuController : MonoBehaviour
     public TMP_Text doorsClosedGoalText;
     public TMP_Text doorsCheckedGoalText;
 
+    [Header("Levels Data")]
+    [Tooltip("Copy the levels array from the GameManager here to show goals in the menu.")]
+    public LevelData[] levels;
+
     [Header("Scene")]
     [Tooltip("Exact name of the Game Scene as registered in Build Settings.")]
     public string gameSceneName = "B";
@@ -116,11 +120,10 @@ public class MenuController : MonoBehaviour
         if (levelTitleText != null)
             levelTitleText.text = $"Level {levelIndex + 1} - Goals";
 
-        // 2. Fetch Goals from GameManager
-        var gm = FindAnyObjectByType<GameManager>();
-        if (gm != null && gm.levels != null && levelIndex >= 0 && levelIndex < gm.levels.Length)
+        // 2. Fetch Goals from local levels array
+        if (levels != null && levelIndex >= 0 && levelIndex < levels.Length)
         {
-            var level = gm.levels[levelIndex];
+            var level = levels[levelIndex];
             
             if (timeGoalText != null) 
                 timeGoalText.text = $"Time Target: {FormatTime(level.targetTimeSeconds)}";
@@ -136,6 +139,10 @@ public class MenuController : MonoBehaviour
             
             if (doorsCheckedGoalText != null) 
                 doorsCheckedGoalText.text = $"Min Doors Checked: {level.minDoorsCheckedRequired}";
+        }
+        else
+        {
+            Debug.LogWarning($"[MenuController] No data found for level index {levelIndex} in the levels array.");
         }
 
         // Unlock the Play button now that a level has been chosen
