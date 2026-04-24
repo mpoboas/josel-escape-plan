@@ -18,6 +18,13 @@ public class EvacuationZone : MonoBehaviour
         {
             Debug.Log($"[Evacuation] Player entered {gameObject.name}. Triggering success sequence.");
 
+            // Stop the siren HUD effect once the evacuation succeeds.
+            SmokeVisionEffect smokeVisionEffect = other.GetComponentInParent<SmokeVisionEffect>();
+            if (smokeVisionEffect != null)
+            {
+                smokeVisionEffect.StopSirenPulse();
+            }
+
             // 1. Prepare the EndPanel (calculate stats) but keep it HIDDEN for now
             if (endPanelController != null)
             {

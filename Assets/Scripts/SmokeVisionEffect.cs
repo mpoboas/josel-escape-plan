@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,18 +17,42 @@ public class SmokeVisionEffect : MonoBehaviour
     [Header("Flame Visual Strength")]
     [SerializeField] private float maxFlameTintAlpha = 0.35f;
 
+    [Header("Start Siren Vignette")]
+    [SerializeField] private bool playSirenPulseOnStart = true;
+    [SerializeField] private float sirenStartDelay = 0f;
+    [SerializeField] private float sirenPulseFrequency = 2.2f;
+    [SerializeField] private float sirenPulseMaxAlpha = 0.6f;
+    [SerializeField] private Color sirenVignetteColor = new Color(0.95f, 0.02f, 0.02f, 1f);
+    [SerializeField] private Material ceillingLightMaterial;
+    [SerializeField] private Material ceillingLightEmergencyMaterial;
+
     private Image fogImage;
     private Image vignetteImage;
     private Image flameTintImage;
+    private Image sirenVignetteImage;
     private float smokeTargetExposure;
     private float smokeCurrentExposure;
     private float flameTargetExposure;
     private float flameCurrentExposure;
     private bool suppressSmokeVisual;
+    private bool sirenPulseActive;
+    private float sirenDelayTimeLeft;
+    private float sirenPulseElapsed;
+    private bool sirenVisualStarted;
+    private bool emergencyLightsActive;
+    private readonly Dictionary<Renderer, Material[]> originalCeillingLightMaterials = new Dictionary<Renderer, Material[]>();
 
     private void Awake()
     {
         CreateOverlay();
+    }
+
+    private void Start()
+    {
+        if (playSirenPulseOnStart)
+        {
+            TriggerSirenPulse();
+        }
     }
 
     private void Update()
@@ -55,6 +80,7 @@ public class SmokeVisionEffect : MonoBehaviour
         );
 
         ApplyExposure(smokeCurrentExposure, flameCurrentExposure);
+        UpdateSirenPulse();
     }
 
     public void SetParticleExposure(int insideParticleCount)
@@ -119,6 +145,11 @@ public class SmokeVisionEffect : MonoBehaviour
 
         flameTintImage = CreateFullscreenImage(canvasGO.transform, "FlameTint");
         flameTintImage.color = new Color(0.95f, 0.12f, 0.06f, 0f);
+
+        sirenVignetteImage = CreateFullscreenImage(canvasGO.transform, "SirenVignette");
+        sirenVignetteImage.sprite = CreateVignetteSprite();
+        sirenVignetteImage.type = Image.Type.Simple;
+        sirenVignetteImage.color = new Color(sirenVignetteColor.r, sirenVignetteColor.g, sirenVignetteColor.b, 0f);
     }
 
     private static Image CreateFullscreenImage(Transform parent, string name)
@@ -166,12 +197,201 @@ public class SmokeVisionEffect : MonoBehaviour
         smokeCurrentExposure = 0f;
         flameTargetExposure = 0f;
         flameCurrentExposure = 0f;
+        StopSirenPulse();
         ApplyExposure(0f, 0f);
         
         if (fogImage != null && fogImage.canvas != null)
         {
             fogImage.canvas.enabled = false;
         }
+    }
+
+    public void TriggerSirenPulse()
+    {
+        sirenPulseActive = true;
+        sirenDelayTimeLeft = Mathf.Max(0f, sirenStartDelay);
+        sirenPulseElapsed = 0f;
+        sirenVisualStarted = false;
+    }
+
+    public void StopSirenPulse()
+    {
+        sirenPulseActive = false;
+        sirenDelayTimeLeft = 0f;
+        sirenPulseElapsed = 0f;
+        sirenVisualStarted = false;
+        ApplySirenAlpha(0f);
+        RestoreCeillingLightMaterials();
+    }
+
+    private void UpdateSirenPulse()
+    {
+        if (sirenVignetteImage == null)
+        {
+            return;
+        }
+
+        if (!sirenPulseActive)
+        {
+            ApplySirenAlpha(0f);
+            return;
+        }
+
+        if (sirenDelayTimeLeft > 0f)
+        {
+            sirenDelayTimeLeft -= Time.deltaTime;
+            ApplySirenAlpha(0f);
+            return;
+        }
+
+        if (!sirenVisualStarted)
+        {
+            sirenVisualStarted = true;
+            ApplyEmergencyCeillingLightMaterials();
+        }
+
+        sirenPulseElapsed += Time.deltaTime;
+        float wave = (Mathf.Sin(sirenPulseElapsed * sirenPulseFrequency * Mathf.PI * 2f) + 1f) * 0.5f;
+        float alpha = wave * sirenPulseMaxAlpha;
+        ApplySirenAlpha(alpha);
+    }
+
+    private void ApplySirenAlpha(float alpha)
+    {
+        if (sirenVignetteImage == null)
+        {
+            return;
+        }
+
+        Color c = sirenVignetteImage.color;
+        c.r = sirenVignetteColor.r;
+        c.g = sirenVignetteColor.g;
+        c.b = sirenVignetteColor.b;
+        c.a = Mathf.Clamp01(alpha);
+        sirenVignetteImage.color = c;
+    }
+
+    private void ApplyEmergencyCeillingLightMaterials()
+    {
+        if (emergencyLightsActive)
+        {
+            return;
+        }
+
+        if (!ResolveCeillingLightMaterials())
+        {
+            return;
+        }
+
+        Renderer[] renderers = FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Renderer r in renderers)
+        {
+            if (r == null)
+            {
+                continue;
+            }
+
+            Material[] shared = r.sharedMaterials;
+            bool changed = false;
+            for (int i = 0; i < shared.Length; i++)
+            {
+                if (IsCeillingLightMaterial(shared[i]))
+                {
+                    if (!originalCeillingLightMaterials.ContainsKey(r))
+                    {
+                        originalCeillingLightMaterials[r] = (Material[])shared.Clone();
+                    }
+
+                    shared[i] = ceillingLightEmergencyMaterial;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                r.sharedMaterials = shared;
+            }
+        }
+
+        emergencyLightsActive = true;
+    }
+
+    private void RestoreCeillingLightMaterials()
+    {
+        if (!emergencyLightsActive)
+        {
+            return;
+        }
+
+        foreach (KeyValuePair<Renderer, Material[]> kv in originalCeillingLightMaterials)
+        {
+            if (kv.Key != null)
+            {
+                kv.Key.sharedMaterials = kv.Value;
+            }
+        }
+
+        originalCeillingLightMaterials.Clear();
+        emergencyLightsActive = false;
+    }
+
+    private bool ResolveCeillingLightMaterials()
+    {
+        if (ceillingLightMaterial != null && ceillingLightEmergencyMaterial != null)
+        {
+            return true;
+        }
+
+        Material[] allMaterials = Resources.FindObjectsOfTypeAll<Material>();
+        foreach (Material mat in allMaterials)
+        {
+            if (mat == null)
+            {
+                continue;
+            }
+
+            if (ceillingLightMaterial == null && MaterialNameEquals(mat, "CeillingLight"))
+            {
+                ceillingLightMaterial = mat;
+            }
+            else if (ceillingLightEmergencyMaterial == null && MaterialNameEquals(mat, "CeillingLightEmergency"))
+            {
+                ceillingLightEmergencyMaterial = mat;
+            }
+        }
+
+        return ceillingLightMaterial != null && ceillingLightEmergencyMaterial != null;
+    }
+
+    private bool IsCeillingLightMaterial(Material mat)
+    {
+        if (mat == null)
+        {
+            return false;
+        }
+
+        if (ceillingLightMaterial != null && mat == ceillingLightMaterial)
+        {
+            return true;
+        }
+
+        return MaterialNameEquals(mat, "CeillingLight");
+    }
+
+    private static bool MaterialNameEquals(Material mat, string expected)
+    {
+        if (mat == null)
+        {
+            return false;
+        }
+
+        string n = mat.name;
+        if (n.EndsWith(" (Instance)"))
+        {
+            n = n.Substring(0, n.Length - " (Instance)".Length);
+        }
+
+        return n == expected;
     }
 
     private static Sprite CreateVignetteSprite()

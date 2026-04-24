@@ -118,13 +118,16 @@ public class CarryableBox : MonoBehaviour, IInteractable
             : transform.forward;
 
         float safeReleaseDistance = ComputeSafeReleaseDistance(releaseForward);
-        transform.position = holdReference.position
+        Vector3 releasePosition = holdReference.position
             + (releaseForward * safeReleaseDistance)
             + (Vector3.up * 0.05f);
+        transform.position = releasePosition;
 
         holdReference = null;
+        Physics.SyncTransforms();
         rb.isKinematic = false;
         rb.useGravity = true;
+        rb.WakeUp();
 
         float impulse = CalculateImpulse(heldSeconds);
         if (impulse > 0f)
@@ -220,7 +223,6 @@ public class CarryableBox : MonoBehaviour, IInteractable
     private void EnsureDynamicColliderCompatibility()
     {
         MeshCollider[] meshColliders = GetComponentsInChildren<MeshCollider>(true);
-        bool hasMeshCollider = false;
         for (int i = 0; i < meshColliders.Length; i++)
         {
             MeshCollider mesh = meshColliders[i];
@@ -229,19 +231,9 @@ public class CarryableBox : MonoBehaviour, IInteractable
                 continue;
             }
 
-            mesh.convex = true;
-            mesh.enabled = true;
-            hasMeshCollider = true;
-        }
-
-        if (hasMeshCollider)
-        {
-            BoxCollider rootBoxCollider = GetComponent<BoxCollider>();
-            if (rootBoxCollider != null)
-            {
-                rootBoxCollider.enabled = false;
-            }
-            return;
+            // Dynamic rigidbodies built from many mesh colliders can tunnel in player builds.
+            // Keep physics stable by using one fitted BoxCollider instead.
+            mesh.enabled = false;
         }
 
         BoxCollider fallback = GetComponent<BoxCollider>();
@@ -250,9 +242,88 @@ public class CarryableBox : MonoBehaviour, IInteractable
             fallback = gameObject.AddComponent<BoxCollider>();
         }
 
-        fallback.center = Vector3.zero;
-        fallback.size = Vector3.one;
+        FitBoxColliderToRenderers(fallback);
         fallback.enabled = true;
+    }
+
+    private void FitBoxColliderToRenderers(BoxCollider colliderToFit)
+    {
+        if (colliderToFit == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+        {
+            colliderToFit.center = Vector3.zero;
+            colliderToFit.size = Vector3.one;
+            return;
+        }
+
+        bool hasBounds = false;
+        Bounds localBounds = new Bounds(Vector3.zero, Vector3.zero);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                localBounds = BuildLocalBoundsFromWorld(renderer.bounds);
+                hasBounds = true;
+            }
+            else
+            {
+                EncapsulateWorldBoundsInLocal(ref localBounds, renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+        {
+            colliderToFit.center = Vector3.zero;
+            colliderToFit.size = Vector3.one;
+            return;
+        }
+
+        Vector3 fittedSize = localBounds.size;
+        fittedSize.x = Mathf.Max(0.1f, fittedSize.x);
+        fittedSize.y = Mathf.Max(0.1f, fittedSize.y);
+        fittedSize.z = Mathf.Max(0.1f, fittedSize.z);
+
+        colliderToFit.center = localBounds.center;
+        colliderToFit.size = fittedSize;
+    }
+
+    private Bounds BuildLocalBoundsFromWorld(Bounds worldBounds)
+    {
+        Vector3 initialPoint = transform.InverseTransformPoint(worldBounds.center);
+        Bounds localBounds = new Bounds(initialPoint, Vector3.zero);
+        EncapsulateWorldBoundsInLocal(ref localBounds, worldBounds);
+        return localBounds;
+    }
+
+    private void EncapsulateWorldBoundsInLocal(ref Bounds localBounds, Bounds worldBounds)
+    {
+        Vector3 extents = worldBounds.extents;
+        Vector3 center = worldBounds.center;
+
+        for (int x = -1; x <= 1; x += 2)
+        {
+            for (int y = -1; y <= 1; y += 2)
+            {
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 worldCorner = center + Vector3.Scale(extents, new Vector3(x, y, z));
+                    Vector3 localCorner = transform.InverseTransformPoint(worldCorner);
+                    localBounds.Encapsulate(localCorner);
+                }
+            }
+        }
     }
 
     private float ComputeSafeReleaseDistance(Vector3 releaseForward)
