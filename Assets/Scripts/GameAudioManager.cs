@@ -210,7 +210,14 @@ public class GameAudioManager : MonoBehaviour
     {
         if (audioLibrary == null)
         {
-            audioLibrary = ScriptableObject.CreateInstance<GameAudioLibrary>();
+            // In builds, we attempt to load the library from a Resources folder.
+            // You should place your GameAudioLibrary asset inside a folder named 'Resources'.
+            audioLibrary = Resources.Load<GameAudioLibrary>("GameAudioLibrary");
+
+            if (audioLibrary == null)
+            {
+                audioLibrary = ScriptableObject.CreateInstance<GameAudioLibrary>();
+            }
         }
 
         audioLibrary.AutoResolveMissingClips();

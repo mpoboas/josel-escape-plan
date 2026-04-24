@@ -104,6 +104,30 @@ public class GameAudioLibrary : ScriptableObject
 
     private static AudioClip[] ResolveMany(string[] preferredNames)
     {
+        // 1. Try to load directly from Resources. 
+        // We use LoadAll("") to find clips in any subfolder (like JOSEL AUDIO)
+        AudioClip[] allResourcesClips = Resources.LoadAll<AudioClip>("");
+        
+        System.Collections.Generic.List<AudioClip> resolvedList = new System.Collections.Generic.List<AudioClip>();
+        
+        foreach (string preferredName in preferredNames)
+        {
+            foreach (AudioClip clip in allResourcesClips)
+            {
+                if (clip != null && clip.name.Equals(preferredName, StringComparison.OrdinalIgnoreCase))
+                {
+                    resolvedList.Add(clip);
+                    break; 
+                }
+            }
+        }
+
+        if (resolvedList.Count > 0)
+        {
+            return resolvedList.ToArray();
+        }
+
+        // 2. Fallback to searching all loaded objects (including editor-only assets)
         AudioClip[] loadedClips = Resources.FindObjectsOfTypeAll<AudioClip>();
 #if UNITY_EDITOR
         // In Editor play mode, clips might exist on disk but not be loaded yet.

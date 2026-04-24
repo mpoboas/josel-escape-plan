@@ -3,6 +3,16 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 
+[System.Serializable]
+public class LevelGoals
+{
+    public float targetTimeSeconds = 120f;
+    public float maxSmokeDamageAllowed = 20f;
+    public float maxFireDamageAllowed = 5f;
+    public int minDoorsClosedRequired = 1;
+    public int minDoorsCheckedRequired = 1;
+}
+
 public class MenuController : MonoBehaviour
 {
     // ─────────────────────────────────────────────────────────────────────
@@ -28,8 +38,8 @@ public class MenuController : MonoBehaviour
     public TMP_Text doorsCheckedGoalText;
 
     [Header("Levels Data")]
-    [Tooltip("Copy the levels array from the GameManager here to show goals in the menu.")]
-    public LevelData[] levels;
+    [Tooltip("Enter the goals for each level here.")]
+    public LevelGoals[] levels;
 
     [Header("Scene")]
     [Tooltip("Exact name of the Game Scene as registered in Build Settings.")]
@@ -75,6 +85,9 @@ public class MenuController : MonoBehaviour
     public void OpenLevelMenu()
     {
         ShowPanel(levelMenuPanel);
+        
+        // Default to Level 1 (index 0) when entering the level menu
+        SelectLevel(0);
     }
 
     /// <summary>
@@ -120,25 +133,25 @@ public class MenuController : MonoBehaviour
         if (levelTitleText != null)
             levelTitleText.text = $"Level {levelIndex + 1} - Goals";
 
-        // 2. Fetch Goals from local levels array
+        // 2. Fetch Goals from local levelGoals array
         if (levels != null && levelIndex >= 0 && levelIndex < levels.Length)
         {
-            var level = levels[levelIndex];
+            var goals = levels[levelIndex];
             
             if (timeGoalText != null) 
-                timeGoalText.text = $"Time Target: {FormatTime(level.targetTimeSeconds)}";
+                timeGoalText.text = FormatTime(goals.targetTimeSeconds);
             
             if (smokeGoalText != null) 
-                smokeGoalText.text = $"Max Smoke: {Mathf.RoundToInt(level.maxSmokeDamageAllowed)}";
+                smokeGoalText.text = Mathf.RoundToInt(goals.maxSmokeDamageAllowed).ToString();
             
             if (fireGoalText != null) 
-                fireGoalText.text = $"Max Fire: {Mathf.RoundToInt(level.maxFireDamageAllowed)}";
+                fireGoalText.text = Mathf.RoundToInt(goals.maxFireDamageAllowed).ToString();
             
             if (doorsClosedGoalText != null) 
-                doorsClosedGoalText.text = $"Min Doors Closed: {level.minDoorsClosedRequired}";
+                doorsClosedGoalText.text = goals.minDoorsClosedRequired.ToString();
             
             if (doorsCheckedGoalText != null) 
-                doorsCheckedGoalText.text = $"Min Doors Checked: {level.minDoorsCheckedRequired}";
+                doorsCheckedGoalText.text = goals.minDoorsCheckedRequired.ToString();
         }
         else
         {

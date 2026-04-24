@@ -2758,15 +2758,21 @@ MonoBehaviour:
   doorsClosedGoalText: {fileID: 412229642}
   doorsCheckedGoalText: {fileID: 86425819}
   levels:
-  - playerSpawnPoint: {fileID: 0}
-    fireScenarios: []
-    hotDoors: []
-    targetTimeSeconds: 0
-    maxSmokeDamageAllowed: 0
-    maxFireDamageAllowed: 0
-    minDoorsClosedRequired: 0
-    minDoorsCheckedRequired: 0
-    boxGroupRoots: []
+  - targetTimeSeconds: 300
+    maxSmokeDamageAllowed: 50
+    maxFireDamageAllowed: 50
+    minDoorsClosedRequired: 1
+    minDoorsCheckedRequired: 1
+  - targetTimeSeconds: 180
+    maxSmokeDamageAllowed: 30
+    maxFireDamageAllowed: 30
+    minDoorsClosedRequired: 3
+    minDoorsCheckedRequired: 3
+  - targetTimeSeconds: 90
+    maxSmokeDamageAllowed: 20
+    maxFireDamageAllowed: 10
+    minDoorsClosedRequired: 5
+    minDoorsCheckedRequired: 5
   gameSceneName: B
 --- !u!4 &636173162
 Transform:
