@@ -55,6 +55,7 @@ public class DeathPanel : MonoBehaviour
     private void Die()
     {
         isDead = true;
+        GameAudioManager.Instance?.PlayFailOnce();
 
         // Ativa o painel de morte
         if (deathPanelObject != null)

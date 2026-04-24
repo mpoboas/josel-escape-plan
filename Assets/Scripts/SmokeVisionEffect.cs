@@ -49,10 +49,7 @@ public class SmokeVisionEffect : MonoBehaviour
 
     private void Start()
     {
-        if (playSirenPulseOnStart)
-        {
-            TriggerSirenPulse();
-        }
+        // The GameManager owns siren/alarm start timing so visual and audio stay in sync.
     }
 
     private void Update()
@@ -208,8 +205,13 @@ public class SmokeVisionEffect : MonoBehaviour
 
     public void TriggerSirenPulse()
     {
+        TriggerSirenPulse(sirenStartDelay);
+    }
+
+    public void TriggerSirenPulse(float startDelaySeconds)
+    {
         sirenPulseActive = true;
-        sirenDelayTimeLeft = Mathf.Max(0f, sirenStartDelay);
+        sirenDelayTimeLeft = Mathf.Max(0f, startDelaySeconds);
         sirenPulseElapsed = 0f;
         sirenVisualStarted = false;
     }
@@ -222,6 +224,7 @@ public class SmokeVisionEffect : MonoBehaviour
         sirenVisualStarted = false;
         ApplySirenAlpha(0f);
         RestoreCeillingLightMaterials();
+        GameAudioManager.Instance?.StopAlarmLoop();
     }
 
     private void UpdateSirenPulse()
@@ -248,6 +251,7 @@ public class SmokeVisionEffect : MonoBehaviour
         {
             sirenVisualStarted = true;
             ApplyEmergencyCeillingLightMaterials();
+            GameAudioManager.Instance?.StartAlarmLoop();
         }
 
         sirenPulseElapsed += Time.deltaTime;

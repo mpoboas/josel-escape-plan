@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -47,6 +48,10 @@ public class GameManager : MonoBehaviour
     [Header("Player Reference")]
     [Tooltip("The player GameObject to be teleported.")]
     public GameObject player;
+
+    [Header("Emergency Audio/Visual Timing")]
+    [Tooltip("Delay in seconds before emergency siren starts (both vignette pulse and alarm audio).")]
+    [SerializeField] private float fireAlarmStartDelay = 0f;
 
     private void Start()
     {
@@ -131,6 +136,9 @@ public class GameManager : MonoBehaviour
                 }
             }
         }
+
+        // GameManager controls siren timing so both visual pulse and alarm audio start together.
+        StartCoroutine(StartEmergencySirenWhenReady());
     }
 
     private void ConfigureLevelBoxGroups(int selectedLevel)
@@ -174,5 +182,41 @@ public class GameManager : MonoBehaviour
                 group.SetActive(true);
             }
         }
+    }
+
+    private IEnumerator StartEmergencySirenWhenReady()
+    {
+        const float maxWaitSeconds = 5f;
+        float elapsed = 0f;
+
+        while (elapsed < maxWaitSeconds)
+        {
+            SmokeVisionEffect smokeVision = null;
+            if (player != null)
+            {
+                smokeVision = player.GetComponentInChildren<SmokeVisionEffect>(true);
+                if (smokeVision != null && !smokeVision.gameObject.scene.IsValid())
+                {
+                    // Ignore prefab asset references accidentally assigned in inspector.
+                    smokeVision = null;
+                }
+            }
+
+            if (smokeVision == null)
+            {
+                smokeVision = Object.FindAnyObjectByType<SmokeVisionEffect>(FindObjectsInactive.Include);
+            }
+
+            if (smokeVision != null && smokeVision.gameObject.activeInHierarchy)
+            {
+                smokeVision.TriggerSirenPulse(fireAlarmStartDelay);
+                yield break;
+            }
+
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        Debug.LogWarning("[GameManager] Could not find active SmokeVisionEffect in time; emergency siren was not triggered.");
     }
 }

@@ -17,6 +17,7 @@ public class EvacuationZone : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             Debug.Log($"[Evacuation] Player entered {gameObject.name}. Triggering success sequence.");
+            GameAudioManager.Instance?.PlaySuccessOnce();
 
             // Stop the siren HUD effect once the evacuation succeeds.
             SmokeVisionEffect smokeVisionEffect = other.GetComponentInParent<SmokeVisionEffect>();

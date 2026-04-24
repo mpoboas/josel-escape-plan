@@ -51,11 +51,19 @@ public class SmokeHealthReceiver : MonoBehaviour
     public void TakeSmokeDamage(float damageAmount)
     {
         ApplyEnvironmentalDamage(damageAmount, ignoreWhenCrouched: true, sourceLabel: "Smoke");
+        if (damageAmount > 0f)
+        {
+            GameAudioManager.Instance?.TryPlayCough(transform.position);
+        }
     }
 
     public void TakeFlameDamage(float damageAmount)
     {
         ApplyEnvironmentalDamage(damageAmount, ignoreWhenCrouched: false, sourceLabel: "Flame");
+        if (damageAmount > 0f)
+        {
+            GameAudioManager.Instance?.TryPlayFireHurt(transform.position);
+        }
     }
 
     private void ApplyEnvironmentalDamage(

@@ -16,6 +16,9 @@ using UnityEngine.UI;
 
 public class FirstPersonController : MonoBehaviour
 {
+    private const string FovPref = "Settings.FOV";
+    private const string SensitivityPref = "Settings.Sensitivity";
+
     private Rigidbody rb;
 
     #region Camera Movement Variables
@@ -141,6 +144,7 @@ public class FirstPersonController : MonoBehaviour
         crosshairObject = GetComponentInChildren<Image>();
 
         // Set internal variables
+        LoadSavedSettings();
         playerCamera.fieldOfView = fov;
         originalScale = transform.localScale;
         jointOriginalPos = joint.localPosition;
@@ -202,6 +206,20 @@ public class FirstPersonController : MonoBehaviour
     }
 
     float camRotation;
+
+    public void ApplySettingsFov(float value)
+    {
+        fov = Mathf.Clamp(value, 45f, 100f);
+        if (playerCamera != null && (!enableZoom || !Input.GetKey(zoomKey)))
+        {
+            playerCamera.fieldOfView = fov;
+        }
+    }
+
+    public void ApplySettingsSensitivity(float value)
+    {
+        mouseSensitivity = Mathf.Clamp(value, 0.1f, 10f);
+    }
 
     private void Update()
     {
@@ -528,6 +546,12 @@ public class FirstPersonController : MonoBehaviour
             timer = 0;
             joint.localPosition = new Vector3(Mathf.Lerp(joint.localPosition.x, jointOriginalPos.x, Time.deltaTime * bobSpeed), Mathf.Lerp(joint.localPosition.y, jointOriginalPos.y, Time.deltaTime * bobSpeed), Mathf.Lerp(joint.localPosition.z, jointOriginalPos.z, Time.deltaTime * bobSpeed));
         }
+    }
+
+    private void LoadSavedSettings()
+    {
+        fov = PlayerPrefs.GetFloat(FovPref, fov);
+        mouseSensitivity = PlayerPrefs.GetFloat(SensitivityPref, mouseSensitivity);
     }
 }
 

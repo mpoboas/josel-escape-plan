@@ -23,6 +23,7 @@ public class DoorController : MonoBehaviour, IInteractable, IInspectable
 
     private bool isOpen = false;
     private bool hasBeenInspected = false;
+    private bool hotDoorPenaltyApplied = false;
     public bool IsOpen => isOpen;
     public bool HasBeenInspected => hasBeenInspected;
 
@@ -54,7 +55,7 @@ public class DoorController : MonoBehaviour, IInteractable, IInspectable
         if (doorAnimator == null) return;
 
         // Se a porta estiver quente e o jogador a abrir SEM inspecionar primeiro
-        if (isHot && !isOpen && !hasBeenInspected)
+        if (isHot && !isOpen && !hasBeenInspected && !hotDoorPenaltyApplied)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
@@ -64,6 +65,7 @@ public class DoorController : MonoBehaviour, IInteractable, IInspectable
                 {
                     Debug.Log($"[DoorController] Player opened hot door without checking! Applying damage.");
                     health.TakeFlameDamage(5f);
+                    hotDoorPenaltyApplied = true;
                 }
             }
         }
@@ -74,11 +76,13 @@ public class DoorController : MonoBehaviour, IInteractable, IInspectable
         {
             doorAnimator.ResetTrigger(closeTrigger);
             doorAnimator.SetTrigger(openTrigger);
+            GameAudioManager.Instance?.PlayDoorOpen(transform.position);
         }
         else
         {
             doorAnimator.ResetTrigger(openTrigger);
             doorAnimator.SetTrigger(closeTrigger);
+            GameAudioManager.Instance?.PlayDoorClose(transform.position);
         }
 
         GameplaySessionStats.Instance?.RegisterDoorStateChanged(this, isOpen, transform.position);
@@ -98,6 +102,7 @@ public class DoorController : MonoBehaviour, IInteractable, IInspectable
     public InspectResult Inspect()
     {
         hasBeenInspected = true;
+        GameAudioManager.Instance?.PlayHeatCheck(transform.position);
         GameplaySessionStats.Instance?.RegisterDoorHeatChecked(this, transform.position);
 
         if (isHot)

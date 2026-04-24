@@ -33,6 +33,8 @@ public class MenuController : MonoBehaviour
 
     private void Start()
     {
+        EnsureAudioSettingsController();
+
         // Make sure we start on the Main Menu
         ShowPanel(mainMenuPanel);
 
@@ -72,6 +74,8 @@ public class MenuController : MonoBehaviour
     /// </summary>
     public void OpenSettingsMenu()
     {
+        AudioSettingsMenu audioSettings = settingsMenuPanel != null ? settingsMenuPanel.GetComponent<AudioSettingsMenu>() : null;
+        audioSettings?.SyncFromAudioManager();
         ShowPanel(settingsMenuPanel);
     }
 
@@ -169,5 +173,18 @@ public class MenuController : MonoBehaviour
         // Show only the target panel
         if (panelToShow != null)
             panelToShow.SetActive(true);
+    }
+
+    private void EnsureAudioSettingsController()
+    {
+        if (settingsMenuPanel == null)
+        {
+            return;
+        }
+
+        if (settingsMenuPanel.GetComponent<AudioSettingsMenu>() == null)
+        {
+            settingsMenuPanel.AddComponent<AudioSettingsMenu>();
+        }
     }
 }
