@@ -27,7 +27,9 @@ public class EndPanelController : MonoBehaviour
     public TMP_Text fireDamageText;
     public TMP_Text doorsClosedText;
     public TMP_Text doorsCheckedText;
+    public TMP_Text scorePercentageText;
 
+    [Header("Internal State (for debugging)")]
     private bool _shown = false;
 
     private void Awake()
@@ -70,20 +72,44 @@ public class EndPanelController : MonoBehaviour
 
         Time.timeScale = 0f;
 
-        // Check for time effectiveness
-        float targetTime = 9999f;
+        // Check for safety and time goals
         var gm = FindAnyObjectByType<GameManager>();
+        float targetTime = 9999f;
+        float maxSmoke = 9999f;
+        float maxFire = 9999f;
+        int reqClosed = 0;
+        int reqChecked = 0;
+
         if (gm != null && gm.levels != null)
         {
             int currentLevelIndex = PlayerPrefs.GetInt("SelectedLevel", 0);
             if (currentLevelIndex >= 0 && currentLevelIndex < gm.levels.Length)
             {
-                targetTime = gm.levels[currentLevelIndex].targetTimeSeconds;
+                var level = gm.levels[currentLevelIndex];
+                targetTime = level.targetTimeSeconds;
+                maxSmoke = level.maxSmokeDamageAllowed;
+                maxFire = level.maxFireDamageAllowed;
+                reqClosed = level.minDoorsClosedRequired;
+                reqChecked = level.minDoorsCheckedRequired;
             }
         }
 
-        float actualTime = stats.ElapsedSeconds;
-        bool timingOk = actualTime <= targetTime;
+        // Calculate actual door stats to verify goals (consistent with RefreshStatsUI)
+        int currentlyClosedThatWereOpened = 0;
+        var allDoors = FindObjectsByType<DoorController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var door in allDoors)
+        {
+            if (door != null && stats.OpenedDoorIdsSet.Contains(door.GetInstanceID()) && !door.IsOpen)
+                currentlyClosedThatWereOpened++;
+        }
+
+        bool timingOk = stats.ElapsedSeconds <= targetTime;
+        bool smokeOk = stats.SmokeDamageTaken <= maxSmoke;
+        bool fireOk = stats.FireDamageTaken <= maxFire;
+        bool closedOk = currentlyClosedThatWereOpened >= reqClosed;
+        bool checkedOk = stats.HeatCheckedDoorCount >= reqChecked;
+
+        bool goalsMet = timingOk && smokeOk && fireOk && closedOk && checkedOk;
 
         // Unlock and show cursor for button interaction
         Cursor.lockState = CursorLockMode.None;
@@ -99,8 +125,8 @@ public class EndPanelController : MonoBehaviour
                 hasNextLevel = (currentLevelIndex + 1) < gm.levels.Length;
             }
 
-            // Only interactable if player reached the goal AND timing was OK AND there is a next level
-            nextButton.interactable = reachedGoal && timingOk && hasNextLevel;
+            // Only interactable if player reached the goal AND ALL safety goals were met AND there is a next level
+            nextButton.interactable = reachedGoal && goalsMet && hasNextLevel;
         }
 
         // Update status text
@@ -112,14 +138,41 @@ public class EndPanelController : MonoBehaviour
             }
             else
             {
-                gameText.text = timingOk ? "Successful Evacuation" : "Ineffective-Evacuation";
+                gameText.text = goalsMet ? "Successful Evacuation" : "Ineffective Evacuation";
             }
         }
+
+        // --- New: Score Percentage Calculation (20% per category) ---
+        float score = 0f;
+
+        // 1. Timing Score (20%): Full 20 if ok, drops linearly if slower (penalty of 1% per 10% extra time)
+        if (timingOk) score += 20f;
+        else score += Mathf.Max(0f, 20f - (stats.ElapsedSeconds - targetTime) / (targetTime * 0.1f));
+
+        // 2. Smoke Score (20%): Full 20 if 0 damage, drops to 0 if at max allowed
+        score += Mathf.Max(0f, 20f * (1f - (stats.SmokeDamageTaken / maxSmoke)));
+
+        // 3. Fire Score (20%): Full 20 if 0 damage, drops to 0 if at max allowed
+        score += Mathf.Max(0f, 20f * (1f - (stats.FireDamageTaken / maxFire)));
+
+        // 4. Doors Closed Score (20%): Ratio of closed vs required
+        if (reqClosed > 0) score += Mathf.Clamp((float)currentlyClosedThatWereOpened / reqClosed, 0f, 1f) * 20f;
+        else score += 20f; // Free points if none required
+
+        // 5. Doors Checked Score (20%): Ratio of checked vs required
+        if (reqChecked > 0) score += Mathf.Clamp((float)stats.HeatCheckedDoorCount / reqChecked, 0f, 1f) * 20f;
+        else score += 20f; // Free points if none required
+
+        if (scorePercentageText != null)
+        {
+            scorePercentageText.text = $"{Mathf.RoundToInt(score)}%";
+        }
+        // -------------------------------------------------------------
 
         RefreshStatsUI();
         EnsureMovementReplay();
 
-        Debug.Log("[EndPanel] Panel displayed.");
+        Debug.Log($"[EndPanel] Panel displayed. Final Score: {score}%");
     }
 
     private void HideHUD()

@@ -16,10 +16,22 @@ public class LevelData
     [Tooltip("Doors that should be hot to the touch in this level.")]
     public DoorController[] hotDoors;
 
-    [Tooltip("Target time to complete the level for a 'Successful Evacuation' (in seconds).")]
-    public float targetTimeSeconds;
+    [Tooltip("Target time to complete the level (in seconds).")]
+    public float targetTimeSeconds = 120f;
 
-    [Tooltip("Parent GameObjects that contain the box setup for this level. Assign empty roots with Box children here.")]
+    [Tooltip("Maximum allowed smoke damage for a Successful Evacuation.")]
+    public float maxSmokeDamageAllowed = 20f;
+
+    [Tooltip("Maximum allowed fire damage for a Successful Evacuation.")]
+    public float maxFireDamageAllowed = 5f;
+
+    [Tooltip("Minimum number of doors the player MUST close (out of those opened).")]
+    public int minDoorsClosedRequired = 1;
+
+    [Tooltip("Minimum number of doors the player MUST heat-check (out of those opened).")]
+    public int minDoorsCheckedRequired = 1;
+
+    [Tooltip("Parent GameObjects that contain the box setup for this level.")]
     public GameObject[] boxGroupRoots;
 }
 
